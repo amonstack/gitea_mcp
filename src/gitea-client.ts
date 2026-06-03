@@ -63,6 +63,18 @@ export interface Comment {
   user: User;
 }
 
+export interface Repo {
+  id: number;
+  full_name: string;
+  name: string;
+  owner: User;
+  description?: string;
+  html_url: string;
+  default_branch?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CreateIssueParams {
   owner: string;
   repo: string;
@@ -94,6 +106,50 @@ export interface ListIssuesParams {
   labels?: string;
   page?: number;
   limit?: number;
+}
+
+export interface SearchIssuesParams {
+  query?: string;
+  type?: "issues" | "pulls";
+  state?: "open" | "closed" | "all";
+  labels?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateLabelParams {
+  owner: string;
+  repo: string;
+  name: string;
+  color: string;
+  description?: string;
+}
+
+export interface UpdateLabelParams {
+  owner: string;
+  repo: string;
+  id: number;
+  name?: string;
+  color?: string;
+  description?: string;
+}
+
+export interface CreateMilestoneParams {
+  owner: string;
+  repo: string;
+  title: string;
+  description?: string;
+  due_on?: string;
+}
+
+export interface UpdateMilestoneParams {
+  owner: string;
+  repo: string;
+  id: number;
+  title?: string;
+  description?: string;
+  due_on?: string;
+  state?: string;
 }
 
 export class GiteaClient {
@@ -182,6 +238,25 @@ export class GiteaClient {
     });
   }
 
+  async deleteIssue(owner: string, repo: string, index: number): Promise<void> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${index}`;
+    return this.request<void>("DELETE", path);
+  }
+
+  async searchIssues(params: SearchIssuesParams): Promise<Issue[]> {
+    const searchParams = new URLSearchParams();
+    if (params.query) searchParams.set("q", params.query);
+    if (params.type) searchParams.set("type", params.type);
+    if (params.state) searchParams.set("state", params.state);
+    if (params.labels) searchParams.set("labels", params.labels);
+    if (params.page) searchParams.set("page", String(params.page));
+    if (params.limit) searchParams.set("limit", String(params.limit));
+
+    const query = searchParams.toString();
+    const path = `/repos/issues/search${query ? `?${query}` : ""}`;
+    return this.request<Issue[]>("GET", path);
+  }
+
   async listComments(
     owner: string,
     repo: string,
@@ -199,5 +274,165 @@ export class GiteaClient {
   ): Promise<Comment> {
     const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${index}/comments`;
     return this.request<Comment>("POST", path, { body });
+  }
+
+  async updateComment(
+    owner: string,
+    repo: string,
+    id: number,
+    body: string,
+  ): Promise<Comment> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/comments/${id}`;
+    return this.request<Comment>("PATCH", path, { body });
+  }
+
+  async deleteComment(
+    owner: string,
+    repo: string,
+    id: number,
+  ): Promise<void> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/comments/${id}`;
+    return this.request<void>("DELETE", path);
+  }
+
+  async listLabels(
+    owner: string,
+    repo: string,
+    page?: number,
+    limit?: number,
+  ): Promise<Label[]> {
+    const searchParams = new URLSearchParams();
+    if (page) searchParams.set("page", String(page));
+    if (limit) searchParams.set("limit", String(limit));
+
+    const query = searchParams.toString();
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/labels${query ? `?${query}` : ""}`;
+    return this.request<Label[]>("GET", path);
+  }
+
+  async createLabel(params: CreateLabelParams): Promise<Label> {
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/labels`;
+    return this.request<Label>("POST", path, {
+      name: params.name,
+      color: params.color,
+      description: params.description,
+    });
+  }
+
+  async updateLabel(params: UpdateLabelParams): Promise<Label> {
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/labels/${params.id}`;
+    return this.request<Label>("PATCH", path, {
+      name: params.name,
+      color: params.color,
+      description: params.description,
+    });
+  }
+
+  async deleteLabel(owner: string, repo: string, id: number): Promise<void> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/labels/${id}`;
+    return this.request<void>("DELETE", path);
+  }
+
+  async addIssueLabels(
+    owner: string,
+    repo: string,
+    index: number,
+    labels: string[],
+  ): Promise<Label[]> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${index}/labels`;
+    return this.request<Label[]>("POST", path, { labels });
+  }
+
+  async removeIssueLabel(
+    owner: string,
+    repo: string,
+    index: number,
+    id: number,
+  ): Promise<void> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${index}/labels/${id}`;
+    return this.request<void>("DELETE", path);
+  }
+
+  async replaceIssueLabels(
+    owner: string,
+    repo: string,
+    index: number,
+    labels: string[],
+  ): Promise<Label[]> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${index}/labels`;
+    return this.request<Label[]>("PUT", path, { labels });
+  }
+
+  async clearIssueLabels(
+    owner: string,
+    repo: string,
+    index: number,
+  ): Promise<void> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${index}/labels`;
+    return this.request<void>("DELETE", path);
+  }
+
+  async listMilestones(
+    owner: string,
+    repo: string,
+    state?: string,
+    page?: number,
+    limit?: number,
+  ): Promise<Milestone[]> {
+    const searchParams = new URLSearchParams();
+    if (state) searchParams.set("state", state);
+    if (page) searchParams.set("page", String(page));
+    if (limit) searchParams.set("limit", String(limit));
+
+    const query = searchParams.toString();
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones${query ? `?${query}` : ""}`;
+    return this.request<Milestone[]>("GET", path);
+  }
+
+  async getMilestone(
+    owner: string,
+    repo: string,
+    id: number,
+  ): Promise<Milestone> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones/${id}`;
+    return this.request<Milestone>("GET", path);
+  }
+
+  async createMilestone(params: CreateMilestoneParams): Promise<Milestone> {
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/milestones`;
+    return this.request<Milestone>("POST", path, {
+      title: params.title,
+      description: params.description,
+      due_on: params.due_on,
+    });
+  }
+
+  async updateMilestone(params: UpdateMilestoneParams): Promise<Milestone> {
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/milestones/${params.id}`;
+    return this.request<Milestone>("PATCH", path, {
+      title: params.title,
+      description: params.description,
+      due_on: params.due_on,
+      state: params.state,
+    });
+  }
+
+  async deleteMilestone(
+    owner: string,
+    repo: string,
+    id: number,
+  ): Promise<void> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones/${id}`;
+    return this.request<void>("DELETE", path);
+  }
+
+  async listMyRepos(page?: number, limit?: number): Promise<Repo[]> {
+    const searchParams = new URLSearchParams();
+    if (page) searchParams.set("page", String(page));
+    if (limit) searchParams.set("limit", String(limit));
+
+    const query = searchParams.toString();
+    const path = `/user/repos${query ? `?${query}` : ""}`;
+    return this.request<Repo[]>("GET", path);
   }
 }
