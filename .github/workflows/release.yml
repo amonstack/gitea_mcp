@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install
+        run: make install
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Package
+        run: make package
+        env:
+          GITHUB_PUBLISH_OWNER: ${{ secrets.GITHUB_OWNER }}
+
+      - name: Publish
+        run: make publish
+        env:
+          GITHUB_PUBLISH_OWNER: ${{ secrets.GITHUB_OWNER }}
+          GITHUB_PUBLISH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: .dist/github/releases/*.tgz
+          generate_release_notes: true
