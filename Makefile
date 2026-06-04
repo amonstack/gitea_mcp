@@ -1,4 +1,4 @@
-.PHONY: all install lint build test test-watch test-integration clean dev sync verify verify-publish package package-source package-release publish
+.PHONY: all install lint build test test-watch test-integration clean dev version sync verify verify-publish package package-source package-release publish
 
 all: lint build
 
@@ -8,7 +8,22 @@ install:
 lint:
 	npm run lint
 
-build:
+version:
+	@if [ -n "$$GITHUB_REF_NAME" ]; then \
+		TAG="$$GITHUB_REF_NAME"; \
+	else \
+		TAG=$$(git describe --tags --abbrev=0 2>/dev/null || echo ""); \
+	fi; \
+	if [ -n "$$TAG" ]; then \
+		VERSION=$${TAG#v}; \
+		CURRENT=$$(node -p "require('./package.json').version"); \
+		if [ "$$VERSION" != "$$CURRENT" ]; then \
+			node -e "var p=require('./package.json');p.version='$$VERSION';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"; \
+			echo "Version: $$VERSION (from tag $$TAG)"; \
+		fi; \
+	fi
+
+build: version
 	npm run build
 
 test:

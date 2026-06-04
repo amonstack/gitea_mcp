@@ -31,6 +31,10 @@ import {
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json") as { version: string };
 
 function parseGitRemoteUrl(remoteUrl: string): { owner: string; repo: string } | null {
   // SSH: git@host:owner/repo.git
@@ -55,7 +59,7 @@ export async function createServer(
   const server = new McpServer(
     {
       name: "gitea-mcp",
-      version: "2.0.0",
+      version: pkg.version,
     },
     {
       capabilities: {
