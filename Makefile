@@ -1,4 +1,4 @@
-.PHONY: all install lint build test test-watch test-integration clean dev package package-source package-release publish
+.PHONY: all install lint build test test-watch test-integration clean dev sync verify verify-publish package package-source package-release publish
 
 all: lint build
 
@@ -25,6 +25,52 @@ clean:
 
 dev:
 	npm run dev
+
+sync:
+	npm install
+
+verify: install lint test
+
+verify-publish:
+	@DETECTPlatform=""; DETECTOwner=""; \
+	if [ -n "$$GITHUB_PUBLISH_OWNER" ]; then \
+		DETECTOwner="$$GITHUB_PUBLISH_OWNER"; \
+	fi; \
+	REMOTE_URL=$$(git remote get-url origin 2>/dev/null); \
+	if [ -n "$$REMOTE_URL" ]; then \
+		HOST=$$(echo "$$REMOTE_URL" | sed -E 's#^https?://([^@]*@)?([^/]+).*#\2#'); \
+		if [ -z "$$DETECTOwner" ]; then \
+			DETECTOwner=$$(echo "$$REMOTE_URL" | sed -E 's#^https?://([^@]*@)?[^/]+/([^/]+).*#\2#'); \
+		fi; \
+		if [ "$$HOST" = "github.com" ]; then \
+			DETECTPlatform="github"; \
+		else \
+			DETECTPlatform="gitea"; \
+		fi; \
+	fi; \
+	if [ -z "$$DETECTPlatform" ] || [ -z "$$DETECTOwner" ]; then \
+		echo "ERROR: Cannot determine platform/owner. Set GITHUB_PUBLISH_OWNER env var or ensure git remote is configured."; \
+		exit 1; \
+	fi; \
+	VERSION=$$(node -p "require('./package.json').version"); \
+	echo "========================================"; \
+	echo " Package : gitea-mcp"; \
+	echo " Version : $$VERSION"; \
+	echo " Platform: $$DETECTPlatform"; \
+	echo " Owner   : $$DETECTOwner"; \
+	if [ "$$DETECTPlatform" = "github" ]; then \
+		echo " Registry: https://npm.pkg.github.com/$$DETECTOwner"; \
+		ARCHIVE=".dist/github/releases/gitea-mcp-$$VERSION.tgz"; \
+	else \
+		echo " Registry: $${GITEA_PUBLISH_URL:-<not set>}"; \
+		ARCHIVE=".dist/gitea/releases/gitea-mcp-$$VERSION.tgz"; \
+	fi; \
+	if [ -f "$$ARCHIVE" ]; then \
+		echo " Archive : $$ARCHIVE ($$(du -h "$$ARCHIVE" | cut -f1))"; \
+	else \
+		echo " Archive : $$ARCHIVE (not found -- run make package first)"; \
+	fi; \
+	echo "========================================"
 
 package: build package-source package-release
 

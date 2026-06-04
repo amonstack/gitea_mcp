@@ -21,14 +21,8 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install
-        run: make install
-
-      - name: Lint
-        run: make lint
-
-      - name: Test
-        run: make test
+      - name: Verify
+        run: make verify
 
       - name: Package
         run: make package
