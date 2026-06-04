@@ -36,7 +36,9 @@ jobs:
           GITHUB_PUBLISH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: .dist/github/releases/*.tgz
-          generate_release_notes: true
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            .dist/github/releases/*.tgz \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
