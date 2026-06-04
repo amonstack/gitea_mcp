@@ -9,7 +9,8 @@ lint:
 	npm run lint
 
 version:
-	@if [ -n "$$GITHUB_REF_NAME" ]; then \
+	@TAG=""; \
+	if [ -n "$$GITHUB_REF_NAME" ] && echo "$$GITHUB_REF_NAME" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+'; then \
 		TAG="$$GITHUB_REF_NAME"; \
 	else \
 		TAG=$$(git describe --tags --abbrev=0 2>/dev/null || echo ""); \
