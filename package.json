@@ -1,6 +1,6 @@
 {
   "name": "@amonstack/gitea-mcp",
-  "version": "1.0.0",
+  "version": "0.1.2",
   "description": "MCP server for managing Gitea issues via API",
   "type": "module",
   "main": "dist/index.js",
