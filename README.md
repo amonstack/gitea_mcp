@@ -18,15 +18,17 @@ The server communicates over stdio and wraps the [Gitea REST API
 
 ## Installation
 
-### From GitHub Packages
+### From npm
 
 ```bash
-npm set @amonstack:registry https://npm.pkg.github.com
-npm set //npm.pkg.github.com/:_authToken YOUR_GITHUB_PAT
 npm install -g @amonstack/gitea-mcp
 ```
 
-Your GitHub PAT needs the `read:packages` scope.
+Or run directly without global install:
+
+```bash
+npx @amonstack/gitea-mcp
+```
 
 ### Build from source
 
