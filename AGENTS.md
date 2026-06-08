@@ -9,8 +9,8 @@
 | Test | `make test` | Unit tests |
 | Test (watch) | `make test-watch` | Watch mode |
 | Test (integration) | `make test-integration` | Integration tests |
-| Package | `make package` | Build + source + release tarballs |
-| Publish | `make publish` | Publish to GitHub/Gitea Packages |
+| Package | `make package` | Build + release tarball |
+| Publish | `make publish` | Publish to npm registry |
 | Clean | `make clean` | Remove dist/ and .dist/ |
 | Dev | `make dev` | Run directly with tsx |
 | All | `make all` | lint + build |
@@ -22,10 +22,7 @@
 - `GITEA_TOKEN` — API access token
 
 ### Publishing
-- `GITHUB_PUBLISH_TOKEN` — GitHub PAT (write:packages scope)
-- `GITEA_PUBLISH_TOKEN` — Gitea token (write:package scope)
-- `GITEA_PUBLISH_URL` — Gitea registry full URL
-- `OWNER` — Package scope (optional, auto-detected from git remote)
+- `NPM_TOKEN` — npm access token (publish permission)
 
 ## Architecture
 

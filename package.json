@@ -1,5 +1,5 @@
 {
-  "name": "gitea-mcp",
+  "name": "@amonstack/gitea-mcp",
   "version": "1.0.0",
   "description": "MCP server for managing Gitea issues via API",
   "type": "module",
@@ -17,8 +17,10 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
-    "prepublishOnly": "npm run build"
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "mcp",
