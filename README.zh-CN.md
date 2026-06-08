@@ -1,6 +1,6 @@
 # gitea-mcp
 
-[English](README.md)
+[English](https://github.com/amonstack/gitea_mcp/blob/master/README.md)
 
 > 让 AI 助手通过 MCP 协议管理 Gitea 仓库 —— 议题、标签、里程碑、评论等功能，
 > 全部通过 Gitea API 实现。

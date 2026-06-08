@@ -1,6 +1,6 @@
 # gitea-mcp
 
-[中文文档](README.zh-CN.md)
+[中文文档](https://github.com/amonstack/gitea_mcp/blob/master/README.zh-CN.md)
 
 > MCP server that lets AI assistants manage Gitea repositories — issues, labels,
 > milestones, comments, and more via the Gitea API.
