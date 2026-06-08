@@ -17,6 +17,6 @@ jobs:
           node-version: 20
       - run: make verify
       - run: make package
-      - run: make verify-publish
+      - run: make publish-dry-run
         env:
-          GITHUB_PUBLISH_OWNER: ${{ secrets.GITHUB_OWNER }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
