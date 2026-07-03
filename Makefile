@@ -1,4 +1,4 @@
-.PHONY: all install lint build test test-watch test-integration clean dev package publish verify
+.PHONY: all install lint build build-assets assets test test-watch test-integration smoke clean dev package publish verify
 
 all: lint build
 
@@ -11,6 +11,11 @@ lint:
 build:
 	npm run build
 
+build-assets:
+	npm run build:assets
+
+assets: build-assets
+
 test:
 	npm test
 
@@ -20,13 +25,16 @@ test-watch:
 test-integration:
 	npm run test:integration
 
+smoke: build
+	npm run smoke
+
 clean:
 	rm -rf dist .dist
 
 dev:
 	npm run dev
 
-verify: install lint test
+verify: install lint build test smoke
 
 package: build
 	@VERSION=$$(node -p "require('./package.json').version"); \

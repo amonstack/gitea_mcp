@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "Node16",
     "moduleResolution": "Node16",
-    "outDir": "dist",
+    "outDir": ".dist/typecheck",
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
@@ -15,5 +15,5 @@
     "types": ["node"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "src/__tests__", "vitest.config.ts", "vitest.integration.config.ts"]
+  "exclude": ["node_modules", "dist", ".dist"]
 }
