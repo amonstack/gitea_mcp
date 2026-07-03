@@ -107,17 +107,26 @@ Add to your opencode MCP configuration:
 
 If you built from source, use `node /path/to/gitea-mcp/dist/cli.js` instead.
 
-opencode also loads native **skills** — one per action (find, create, update,
-label, summarize, plan milestones, resolve repo) — that teach the assistant the
-safest workflow for that action, including pre-use checks and pitfalls. Install
-them once:
+opencode and other AI tools can load native **skills** — one per action (find,
+create, update, label, comment, summarize, plan milestones, resolve repo) — that
+teach the assistant the safest workflow for that action, including pre-use checks
+and pitfalls. Install them once with the `init` command, targeting your tool
+(`--tool`, default `opencode`):
 
 ```bash
-gitea-mcp skills install            # global (~/.config/opencode/skills/)
-gitea-mcp skills install --project  # this project (./.opencode/skills/)
+gitea-mcp init                      # opencode (global ~/.config/opencode/skills/)
+gitea-mcp init --tool claude        # Claude Code (~/.claude/skills/)
+gitea-mcp init --tool cursor        # Cursor (~/.cursor/skills/)
+gitea-mcp init --project            # this project (./.<tool>/skills/)
+gitea-mcp init --dir /exact/path    # custom location
 ```
 
-Then restart opencode. See [AI Guidance & Skills](#ai-guidance--skills) below.
+Supported `--tool` values: `amazon-q`, `antigravity`, `auggie`, `claude`,
+`cline`, `codex`, `codebuddy`, `continue`, `costrict`, `crush`, `cursor`,
+`factory`, `gemini`, `github-copilot`, `iflow`, `kilocode`, `opencode`, `qoder`,
+`qwen`, `roocode`, `windsurf`. Paths follow each tool's conventional skills
+directory; use `--dir` for an exact location. Then restart your tool. See
+[AI Guidance & Skills](#ai-guidance--skills) below.
 
 ### Other MCP Clients
 
@@ -195,12 +204,12 @@ through three channels:
   `summarize_issue`, `audit_labels`, `milestone_report`) and on-demand reference
   docs (field reference, label guide, tool cookbook) for clients that surface them.
 
-### opencode skills
+### Action skills
 
-For opencode, the server ships a set of **action-scoped skills** — one per
-workflow, so the assistant loads only the guidance it needs (and never, say,
-delete instructions while creating). Install them with the
-`gitea-mcp skills install` command shown in the opencode section above.
+For opencode and other tools, the server ships a set of **action-scoped skills**
+— one per workflow, so the assistant loads only the guidance it needs (and never,
+say, delete instructions while creating). Install them with the
+`gitea-mcp init --tool <name>` command shown above.
 
 | Skill | Invoke when |
 |-------|-------------|
@@ -209,14 +218,17 @@ delete instructions while creating). Install them with the
 | `gitea-update-issue` | editing fields, closing, clearing assignee/milestone |
 | `gitea-label-issue` | adding / replacing / removing / clearing labels on an issue |
 | `gitea-manage-labels` | creating or editing label definitions |
+| `gitea-comment-issue` | posting a comment that advances an issue's discussion |
 | `gitea-summarize-issue` | reading and summarizing an issue's discussion |
 | `gitea-plan-milestones` | creating / editing / closing milestones |
 | `gitea-resolve-repo` | resolving owner/repo or listing repositories |
 
 Each skill is a short, AI-facing action flow (purpose, when to use, when not to,
-rules, and what to check first). Destructive single-tool actions (delete issue /
-comment / label / milestone) are intentionally left to the tool descriptions so
-they never contaminate a creative workflow.
+rules, and what to check first). The create, comment, and milestone skills also
+embed **body templates** (bug / feature / performance issue, comment, milestone)
+that standardize the format of what the assistant writes. Destructive
+single-tool actions (delete issue / comment / label / milestone) are intentionally
+left to the tool descriptions so they never contaminate a creative workflow.
 
 ## Development
 

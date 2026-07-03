@@ -5,16 +5,24 @@ vi.mock("../server.js", () => ({
   runServer: vi.fn(),
 }));
 
+vi.mock("../skills.js", () => ({
+  runInitCommand: vi.fn(),
+}));
+
 const REQUIRED_MESSAGE = "GITEA_BASE_URL and GITEA_TOKEN environment variables are required";
 
 describe("cli entry point", () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let errSpy: ReturnType<typeof vi.spyOn>;
   let savedEnv: NodeJS.ProcessEnv;
+  let savedArgv: string[];
 
   beforeEach(() => {
     vi.resetModules();
     savedEnv = { ...process.env };
+    savedArgv = process.argv.slice();
+    // Deterministic argv so tests do not depend on the vitest runner's flags.
+    process.argv = ["node", "cli.js"];
     delete process.env.GITEA_BASE_URL;
     delete process.env.GITEA_TOKEN;
     delete process.env.GITEA_DEFAULT_OWNER;
@@ -30,6 +38,7 @@ describe("cli entry point", () => {
 
   afterEach(() => {
     process.env = savedEnv;
+    process.argv = savedArgv;
     vi.restoreAllMocks();
   });
 
@@ -81,6 +90,30 @@ describe("cli entry point", () => {
     process.env.GITEA_TOKEN = "tok";
     exitSpy.mockImplementation((() => undefined) as never);
     vi.mocked(runServer).mockRejectedValue(new Error("boom"));
+    await import("../cli.js");
+    await vi.waitFor(() => {
+      expect(errSpy).toHaveBeenCalledWith("Fatal error:", expect.any(Error));
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  it("dispatches the init subcommand to runInitCommand without credentials", async () => {
+    process.argv = ["node", "cli.js", "init", "--tool", "claude"];
+    const skills = await import("../skills.js");
+    vi.mocked(skills.runInitCommand).mockResolvedValue(undefined);
+    await import("../cli.js");
+    await vi.waitFor(() => {
+      expect(skills.runInitCommand).toHaveBeenCalledWith(["--tool", "claude"]);
+    });
+    expect(runServer).not.toHaveBeenCalled();
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  it("logs a fatal error and exits when runInitCommand rejects", async () => {
+    process.argv = ["node", "cli.js", "init"];
+    exitSpy.mockImplementation((() => undefined) as never);
+    const skills = await import("../skills.js");
+    vi.mocked(skills.runInitCommand).mockRejectedValue(new Error("boom"));
     await import("../cli.js");
     await vi.waitFor(() => {
       expect(errSpy).toHaveBeenCalledWith("Fatal error:", expect.any(Error));

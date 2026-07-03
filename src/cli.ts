@@ -3,11 +3,12 @@ import { runServer } from "./server.js";
 
 const argv = process.argv.slice(2);
 
-if (argv[0] === "skills") {
-  // `gitea-mcp skills ...` manages the bundled opencode skill. It needs no Gitea
-  // credentials, so it is dispatched before the env-var guard below.
-  const { runSkillsCommand } = await import("./skills.js");
-  runSkillsCommand(argv.slice(1)).catch((err) => {
+if (argv[0] === "init") {
+  // `gitea-mcp init [--tool <name>]` installs the bundled skills into a target
+  // AI tool's skills directory. It needs no Gitea credentials, so it is
+  // dispatched before the env-var guard below.
+  const { runInitCommand } = await import("./skills.js");
+  runInitCommand(argv.slice(1)).catch((err: unknown) => {
     console.error("Fatal error:", err);
     process.exit(1);
   });
@@ -22,7 +23,7 @@ if (argv[0] === "skills") {
     process.exit(1);
   }
 
-  runServer(baseUrl, token, defaultOwner, defaultRepo).catch((err) => {
+  runServer(baseUrl, token, defaultOwner, defaultRepo).catch((err: unknown) => {
     console.error("Fatal error:", err);
     process.exit(1);
   });

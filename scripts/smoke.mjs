@@ -6,6 +6,7 @@ import { mkdtemp, rm, readFile, access, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const failures = [];
@@ -18,15 +19,19 @@ function check(cond, msg) {
 }
 
 try {
-  // 1. The skills-install CLI path runs end-to-end on the compiled artifact,
-  //    and every bundled skill is copied with valid frontmatter.
+  // 1. The init CLI path runs end-to-end on the compiled artifact, and every
+  //    bundled skill is copied with valid frontmatter into a tool's skills dir.
   const dest = await mkdtemp(join(tmpdir(), "gitea-smoke-"));
-  const { runSkillsCommand } = await import(join(root, "dist", "skills.js"));
-  await runSkillsCommand(["install", "--dir", dest]);
+  const { runInitCommand } = await import(join(root, "dist", "skills.js"));
+  await runInitCommand(["--tool", "opencode", "--dir", dest]);
   const bundledSkills = (
     await readdir(join(root, "dist", "assets", "skills"), { withFileTypes: true })
   ).filter((e) => e.isDirectory());
-  check(bundledSkills.length >= 8, `at least 8 skills bundled (got ${bundledSkills.length})`);
+  check(bundledSkills.length >= 9, `at least 9 skills bundled (got ${bundledSkills.length})`);
+  check(
+    bundledSkills.some((e) => e.name === "gitea-comment-issue"),
+    "gitea-comment-issue skill bundled",
+  );
   for (const e of bundledSkills) {
     const installed = await readFile(join(dest, e.name, "SKILL.md"), "utf-8");
     check(
@@ -35,6 +40,15 @@ try {
     );
   }
   await rm(dest, { recursive: true, force: true });
+
+  // 1b. The CLI dispatch (`gitea-mcp init`) wires through to runInitCommand at
+  //     runtime, targeting a non-default tool.
+  const cliDest = await mkdtemp(join(tmpdir(), "gitea-cli-"));
+  const cliOut = execFileSync(process.execPath, [join(root, "dist", "cli.js"), "init", "--tool", "claude", "--dir", cliDest], {
+    encoding: "utf-8",
+  });
+  check(cliOut.includes("Claude Code") && cliOut.includes("gitea-mcp skill"), "cli `init --tool claude` dispatches and targets the right tool");
+  await rm(cliDest, { recursive: true, force: true });
 
   // 2. The server constructs at runtime and wires the guidance layer from assets.
   const { createServer } = await import(join(root, "dist", "server.js"));

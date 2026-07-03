@@ -65,15 +65,15 @@ responsibility:
 ```
 src/
 ├── index.ts           # Package entry (main); re-exports createServer/runServer for programmatic use
-├── cli.ts            # Process entry point (env → runServer, skills CLI dispatch)
+├── cli.ts            # Process entry point (env → runServer, init CLI dispatch)
 ├── server.ts         # McpServer, tool/prompt/resource registration, resolve(), parseGitRemoteUrl
 ├── tools.ts          # One Zod schema per tool input
 ├── gitea-client.ts   # GiteaClient REST wrapper (request<T> + HTTP methods)
-├── skills.ts         # opencode skill install logic (gitea-mcp skills install)
+├── skills.ts         # skill install logic + tool registry (gitea-mcp init --tool <name>)
 ├── assets/           # Guidance content (shipped inside dist/ via copy-assets)
 │   ├── instructions.md          # handshake instructions (Track A)
 │   ├── resources/*.md           # on-demand reference docs (Track A)
-│   └── skills/<action>/SKILL.md # opencode action skills, one per workflow (Track B)
+│   └── skills/<action>/SKILL.md # action skills, one per workflow (Track B)
 └── __tests__/
     ├── *.test.ts             # Unit tests (stub global.fetch)
     └── *.integration.test.ts # Integration tests (live Gitea, opt-in)
@@ -84,12 +84,12 @@ scripts/
 | File | Responsibility (invariant) |
 |------|----------------------------|
 | `src/index.ts` | The package `main` entry. Re-exports `createServer` and `runServer` from `server.ts` so `import "@amonstack/gitea-mcp"` works for programmatic use. Defines nothing of its own. |
-| `src/cli.ts` | Process entry point for the `gitea-mcp` bin. Reads env vars (`GITEA_BASE_URL`, `GITEA_TOKEN`, `GITEA_DEFAULT_OWNER`, `GITEA_DEFAULT_REPO`), validates the required ones, and calls `runServer`. Dispatches the `gitea-mcp skills ...` subcommand (no credentials required) to `skills.ts`. Contains no tool or HTTP logic. |
+| `src/cli.ts` | Process entry point for the `gitea-mcp` bin. Reads env vars (`GITEA_BASE_URL`, `GITEA_TOKEN`, `GITEA_DEFAULT_OWNER`, `GITEA_DEFAULT_REPO`), validates the required ones, and calls `runServer`. Dispatches the `gitea-mcp init ...` subcommand (no credentials required) to `skills.ts`. Contains no tool or HTTP logic. |
 | `src/server.ts` | Creates the `McpServer`, registers every tool (name + Zod schema + handler), prompt, and resource, owns the `resolve()` owner/repo fallback and `parseGitRemoteUrl`, and loads the handshake `instructions` from `assets/instructions.md`. Exports `createServer` and `runServer`. |
 | `src/tools.ts` | Exports one Zod schema per tool input. The set of schemas stays 1:1 with the tools registered in `server.ts` and the tool tables in `README.md`. |
 | `src/gitea-client.ts` | `GiteaClient` — the REST client wrapping Gitea `/api/v1`. Owns the `request<T>` helper (auth header, JSON, `204` handling) and all HTTP methods. Contains no MCP/stdio logic. |
-| `src/skills.ts` | The `gitea-mcp skills install` implementation: copies every bundled skill (each subdirectory of `dist/assets/skills/` containing a `SKILL.md`) into the user's opencode skills directory, one folder per skill. No MCP/HTTP logic; no Gitea credentials required. |
-| `src/assets/**` | Markdown guidance content (instructions, resources, the opencode action skills). Pure data, read at runtime; copied into `dist/assets/` by `scripts/copy-assets.mjs` so it ships with the published package. |
+| `src/skills.ts` | The `gitea-mcp init --tool <name>` implementation: carries the registry of supported target tools and, for the chosen tool, copies every bundled skill (each subdirectory of `dist/assets/skills/` containing a `SKILL.md`) into that tool's skills directory, one folder per skill. No MCP/HTTP logic; no Gitea credentials required. |
+| `src/assets/**` | Markdown guidance content (instructions, resources, the action skills). Pure data, read at runtime; copied into `dist/assets/` by `scripts/copy-assets.mjs` so it ships with the published package. |
 
 `cli.ts` is a thin shell; `server.ts` is the composition root; `tools.ts` is
 pure schema declarations; `gitea-client.ts` is pure HTTP. Mixing concerns
@@ -103,14 +103,14 @@ list):
 ```
 cli.ts
   ├─► server.ts        (runServer — default MCP mode)
-  └─► skills.ts        (runSkillsCommand — only the `gitea-mcp skills` subcommand)
+  └─► skills.ts        (runInitCommand — only the `gitea-mcp init` subcommand)
 server.ts
   ├─► tools.ts          (Zod schemas)
   ├─► gitea-client.ts   (GiteaClient)
   ├─► @modelcontextprotocol/sdk  (McpServer, StdioServerTransport)
   └─► assets/*.md       (readFile at runtime: instructions + resources)
 skills.ts
-  └─► assets/skills/<action>/SKILL.md  (read bundled skills tree, copy to opencode dir)
+  └─► assets/skills/<action>/SKILL.md  (read bundled skills tree, copy to target tool dir)
 ```
 
 Rules implied by the graph:
@@ -121,7 +121,7 @@ Rules implied by the graph:
   `gitea-client.ts`; it is the composition root that wires schemas to handlers
   to client methods. It also reads guidance markdown from `assets/`.
 - `cli.ts` depends on `server.ts`'s `runServer` and (lazily, only for the
-  `skills` subcommand) on `skills.ts`. No file imports `cli.ts`.
+  `init` subcommand) on `skills.ts`. No file imports `cli.ts`.
 - `skills.ts` is a leaf that only reads the bundled skills tree; it touches no
   MCP/HTTP logic and needs no Gitea credentials.
 - There are no cycles and no hidden lateral imports (e.g. `gitea-client.ts`
@@ -204,7 +204,7 @@ markdown under `src/assets/` (copied into `dist/assets/` at build time):
 | tool `description` | inline in `server.ts` `registerTool` | `tools/list` | all clients |
 | prompts | `server.ts` `registerPrompt` (body is an inline template) | `prompts/get` | clients that surface prompts |
 | resources | `server.ts` `registerResource`, reads `assets/resources/*.md` | `resources/read` | clients that surface resources |
-| opencode skills | `assets/skills/<action>/SKILL.md` (one per workflow) | `gitea-mcp skills install` copies each to the opencode skills dir, one folder per skill | opencode |
+| action skills | `assets/skills/<action>/SKILL.md` (one per workflow) | `gitea-mcp init --tool <name>` copies each to the target tool's skills dir, one folder per skill | opencode + other tools (via `--tool`) |
 
 Coordination rule (parallel to §5.4): guidance is a coordinated change across
 `server.ts` (the registration / load site) + the matching `assets/*.md` (the content)

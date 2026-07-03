@@ -22,3 +22,20 @@ Create / edit / close milestones. Tools: `list_milestones`, `get_milestone`, `cr
 
 ## get_milestone
 - Read one milestone by `id`: includes `open_issues` / `closed_issues` counts for progress (progress = closed / (open + closed)).
+
+## Description template — standardize what you write into `description`
+Milestones succeed when scope is explicit. When creating or editing, structure `description` with this template; keep it short and drop empty sections.
+
+```markdown
+**Goal:** <the single outcome this milestone delivers>
+
+**Scope**
+- In: <what this milestone covers>
+- Out: <what is explicitly deferred>
+
+**Acceptance criteria**
+- <observable, checkable condition>
+- <observable, checkable condition>
+
+**Owners:** <who is accountable>
+```

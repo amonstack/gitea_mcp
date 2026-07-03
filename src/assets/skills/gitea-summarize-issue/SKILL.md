@@ -1,6 +1,6 @@
 ---
 name: gitea-summarize-issue
-description: Invoke to READ and SUMMARIZE an issue's discussion — the issue body plus its comment thread. Do NOT invoke to create/edit an issue (gitea-create-issue / gitea-update-issue), post or edit a comment (no skill — single tool), or manage labels/milestones.
+description: Invoke to READ and SUMMARIZE an issue's discussion — the issue body plus its comment thread. Do NOT invoke to create/edit an issue (gitea-create-issue / gitea-update-issue), post a comment (gitea-comment-issue), or manage labels/milestones.
 ---
 
 # gitea-summarize-issue
