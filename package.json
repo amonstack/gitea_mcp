@@ -11,13 +11,15 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json && npm run build:assets",
+    "build:assets": "node scripts/copy-assets.mjs",
     "dev": "tsx src/cli.ts",
     "start": "node dist/cli.js",
-    "lint": "tsc --noEmit",
+    "lint": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "smoke": "node scripts/smoke.mjs"
   },
   "publishConfig": {
     "access": "public"

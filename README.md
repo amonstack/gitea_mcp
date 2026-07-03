@@ -97,6 +97,18 @@ Add to your opencode MCP configuration:
 
 If you built from source, use `node /path/to/gitea-mcp/dist/cli.js` instead.
 
+opencode also loads native **skills** — one per action (find, create, update,
+label, summarize, plan milestones, resolve repo) — that teach the assistant the
+safest workflow for that action, including pre-use checks and pitfalls. Install
+them once:
+
+```bash
+gitea-mcp skills install            # global (~/.config/opencode/skills/)
+gitea-mcp skills install --project  # this project (./.opencode/skills/)
+```
+
+Then restart opencode. See [AI Guidance & Skills](#ai-guidance--skills) below.
+
 ### Other MCP Clients
 
 Any client that supports stdio-based MCP servers can use `gitea-mcp`. After
@@ -160,6 +172,42 @@ gitea-mcp
 | `list_my_repos` | List repositories accessible to the authenticated user |
 | `resolve_repo` | Auto-detect `owner` and `repo` from a local git remote URL |
 
+## AI Guidance & Skills
+
+The server ships guidance so assistants use the tools correctly and safely,
+through three channels:
+
+- **`instructions` (on connect)** — a concise strategy the server sends during the
+  MCP handshake; capable clients inject it into the system prompt automatically.
+- **Tool descriptions** — every tool's description flags its key risk (pagination,
+  label ID-vs-name, destructive scope) and a minimal usage example.
+- **Prompts & resources** — workflow templates (`triage_issues`,
+  `summarize_issue`, `audit_labels`, `milestone_report`) and on-demand reference
+  docs (field reference, label guide, tool cookbook) for clients that surface them.
+
+### opencode skills
+
+For opencode, the server ships a set of **action-scoped skills** — one per
+workflow, so the assistant loads only the guidance it needs (and never, say,
+delete instructions while creating). Install them with the
+`gitea-mcp skills install` command shown in the opencode section above.
+
+| Skill | Invoke when |
+|-------|-------------|
+| `gitea-find-issues` | discovering / reading / triaging issues |
+| `gitea-create-issue` | creating an issue (after a duplicate check) |
+| `gitea-update-issue` | editing fields, closing, clearing assignee/milestone |
+| `gitea-label-issue` | adding / replacing / removing / clearing labels on an issue |
+| `gitea-manage-labels` | creating or editing label definitions |
+| `gitea-summarize-issue` | reading and summarizing an issue's discussion |
+| `gitea-plan-milestones` | creating / editing / closing milestones |
+| `gitea-resolve-repo` | resolving owner/repo or listing repositories |
+
+Each skill is a short, AI-facing action flow (purpose, when to use, when not to,
+rules, and what to check first). Destructive single-tool actions (delete issue /
+comment / label / milestone) are intentionally left to the tool descriptions so
+they never contaminate a creative workflow.
+
 ## Development
 
 ```bash
@@ -177,15 +225,8 @@ npm ci
 | `make test-integration` | Run integration tests (needs live Gitea instance) |
 | `make dev` | Run directly with tsx |
 
-### Project layout
-
-```
-src/
-  cli.ts           # Entry point
-  server.ts        # MCP server setup and tool registration
-  tools.ts         # Zod input schemas for all tools
-  gitea-client.ts  # REST client wrapping Gitea /api/v1 endpoints
-```
+For the full architecture — module layout, dependency graph, core patterns, and
+the guide to adding a new tool — see [`docs/architecture.md`](docs/architecture.md).
 
 ## License
 

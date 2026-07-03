@@ -96,6 +96,17 @@ node dist/cli.js
 
 如果从源码构建，将 `command` 改为 `node /path/to/gitea-mcp/dist/cli.js`。
 
+opencode 还会加载原生**技能（skills）**——按动作拆分（查找、创建、更新、打
+标签、总结、规划里程碑、解析仓库等），教会助手针对该动作的最安全工作流，含
+使用前检查与各类陷阱。一次性安装：
+
+```bash
+gitea-mcp skills install            # 全局（~/.config/opencode/skills/）
+gitea-mcp skills install --project  # 仅当前项目（./.opencode/skills/）
+```
+
+然后重启 opencode。详见下方 [AI 引导与技能](#ai-引导与技能)。
+
 ### 其他 MCP 客户端
 
 任何支持 stdio 方式运行 MCP 服务端的客户端都可以使用。安装完成后设置环境
@@ -159,6 +170,39 @@ gitea-mcp
 | `list_my_repos` | 列出当前用户可访问的仓库 |
 | `resolve_repo` | 从本地 git 仓库的远程地址自动检测 `owner` 和 `repo` |
 
+## AI 引导与技能
+
+服务端内置了引导内容，让助手正确、安全地使用工具，分三个通道：
+
+- **`instructions`（连接时）** —— 服务端在 MCP 握手时下发一份精炼策略；支持的
+  客户端会自动注入系统提示。
+- **工具描述** —— 每个工具的描述都标出其关键风险（分页、标签 ID 与名称、破坏性
+  作用范围）和最小用法示例。
+- **Prompts 与 Resources** —— 工作流模板（`triage_issues`、`summarize_issue`、
+  `audit_labels`、`milestone_report`）与按需参考文档（字段参考、标签指南、工具
+  食谱），供支持的客户端使用。
+
+### opencode 技能
+
+对 opencode，服务端内置了一组**按动作划分的技能**——每个工作流一个，助手只
+加载所需指引（避免例如创建时把删除说明一并带入造成幻觉）。用上面 opencode
+小节展示的 `gitea-mcp skills install` 命令安装。
+
+| 技能 | 何时触发 |
+|------|----------|
+| `gitea-find-issues` | 发现 / 读取 / 分流 issues |
+| `gitea-create-issue` | 创建 issue（先做查重） |
+| `gitea-update-issue` | 编辑字段、关闭、清空负责人/里程碑 |
+| `gitea-label-issue` | 为 issue 增加 / 替换 / 移除 / 清空标签 |
+| `gitea-manage-labels` | 创建或编辑标签定义 |
+| `gitea-summarize-issue` | 读取并总结某 issue 的讨论 |
+| `gitea-plan-milestones` | 创建 / 编辑 / 关闭里程碑 |
+| `gitea-resolve-repo` | 解析 owner/repo 或列出仓库 |
+
+每个技能都是面向 AI 的简短动作流程（目的、何时用、何时不用、规则、先检查什么）。
+破坏性的单工具操作（删除 issue / 评论 / 标签 / 里程碑）有意仅保留在工具描述里，
+不会污染创建类工作流。
+
 ## 二次开发
 
 ```bash
@@ -176,15 +220,8 @@ npm ci
 | `make test-integration` | 运行集成测试（需要可用的 Gitea 实例） |
 | `make dev` | 通过 tsx 直接运行 |
 
-### 项目结构
-
-```
-src/
-  cli.ts           # 入口文件
-  server.ts        # MCP 服务端搭建与工具注册
-  tools.ts         # 所有工具的 Zod 输入模式定义
-  gitea-client.ts  # 封装 Gitea /api/v1 端点的 REST 客户端
-```
+完整的架构说明（模块布局、依赖关系、核心模式，以及新增工具的指引）请参阅
+[`docs/architecture.md`](docs/architecture.md)。
 
 ## 许可证
 
