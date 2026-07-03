@@ -18,7 +18,7 @@ The server communicates over stdio and wraps the [Gitea REST API
 
 ## Installation
 
-### From npm
+### From npm (npmjs.com)
 
 ```bash
 npm install -g @amonstack/gitea-mcp
@@ -28,6 +28,16 @@ Or run directly without global install:
 
 ```bash
 npx @amonstack/gitea-mcp
+```
+
+### From GitHub Packages
+
+Each release is also published to GitHub Packages. Route the `@amonstack` scope there
+once, then install:
+
+```bash
+echo "@amonstack:registry=https://npm.pkg.github.com" >> ~/.npmrc
+npm install -g @amonstack/gitea-mcp
 ```
 
 ### Build from source

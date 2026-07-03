@@ -2,6 +2,14 @@
   "name": "@amonstack/gitea-mcp",
   "version": "0.0.0",
   "description": "MCP server for managing Gitea issues via API",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amonstack/gitea_mcp.git"
+  },
+  "homepage": "https://github.com/amonstack/gitea_mcp#readme",
+  "bugs": {
+    "url": "https://github.com/amonstack/gitea_mcp/issues"
+  },
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -29,8 +37,11 @@
     "gitea",
     "issues"
   ],
-  "author": "",
+  "author": "amonstack",
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.4.3"
