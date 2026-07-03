@@ -64,6 +64,7 @@ responsibility:
 
 ```
 src/
+├── index.ts           # Package entry (main); re-exports createServer/runServer for programmatic use
 ├── cli.ts            # Process entry point (env → runServer, skills CLI dispatch)
 ├── server.ts         # McpServer, tool/prompt/resource registration, resolve(), parseGitRemoteUrl
 ├── tools.ts          # One Zod schema per tool input
@@ -82,6 +83,7 @@ scripts/
 
 | File | Responsibility (invariant) |
 |------|----------------------------|
+| `src/index.ts` | The package `main` entry. Re-exports `createServer` and `runServer` from `server.ts` so `import "@amonstack/gitea-mcp"` works for programmatic use. Defines nothing of its own. |
 | `src/cli.ts` | Process entry point for the `gitea-mcp` bin. Reads env vars (`GITEA_BASE_URL`, `GITEA_TOKEN`, `GITEA_DEFAULT_OWNER`, `GITEA_DEFAULT_REPO`), validates the required ones, and calls `runServer`. Dispatches the `gitea-mcp skills ...` subcommand (no credentials required) to `skills.ts`. Contains no tool or HTTP logic. |
 | `src/server.ts` | Creates the `McpServer`, registers every tool (name + Zod schema + handler), prompt, and resource, owns the `resolve()` owner/repo fallback and `parseGitRemoteUrl`, and loads the handshake `instructions` from `assets/instructions.md`. Exports `createServer` and `runServer`. |
 | `src/tools.ts` | Exports one Zod schema per tool input. The set of schemas stays 1:1 with the tools registered in `server.ts` and the tool tables in `README.md`. |
