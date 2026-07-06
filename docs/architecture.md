@@ -272,6 +272,9 @@ non-Gitea directories.
 - `make test` (`vitest run`) plus a runtime smoke run of the built `dist/` cover the
   runtime/type-decoupling and module-resolution classes that neither emit nor
   `--noEmit` can catch.
+- `make scan` runs `gitleaks detect` against the working tree (config in
+  `.gitleaks.toml`, report written to `.dist/leaks.json`); it is the FIRST step
+  of `make verify` so a leaked secret fails the CI build before any other check.
 - The published npm package ships **only** `dist/` (`"files": ["dist"]` in
   `package.json`; `src/`, `tsconfig*.json`, and tests are excluded via `.npmignore`).
   Guidance markdown rides along inside `dist/assets/`.

@@ -27,7 +27,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "scan": "gitleaks detect --source . --redact --report-format json -r .dist/leaks.json --no-banner"
   },
   "publishConfig": {
     "access": "public"

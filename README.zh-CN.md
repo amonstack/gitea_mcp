@@ -279,6 +279,7 @@ npm ci
 | `make test` | 运行单元测试 |
 | `make test-watch` | 监听模式运行测试 |
 | `make test-integration` | 运行集成测试（需要可用的 Gitea 实例） |
+| `make scan` | 用 gitleaks 扫描泄露的密钥（属于 `make verify`） |
 | `make dev` | 通过 tsx 直接运行 |
 
 完整的架构说明（模块布局、依赖关系、核心模式，以及新增工具的指引）请参阅
