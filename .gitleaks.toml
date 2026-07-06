@@ -1,0 +1,20 @@
+# gitleaks configuration for gitea-mcp
+# Extends the default gitleaks ruleset (built-in detectors for 100+ secret types)
+# and allowlists paths that legitimately contain token-shaped test fixtures or
+# are already covered by .gitignore.
+
+title = "gitea-mcp"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist build artifacts, dependencies, and test fixtures"
+paths = [
+  '''node_modules/''',
+  '''dist/''',
+  '''.dist/''',
+  '''src/__tests__/.*\.ts''',
+  '''package-lock\.json''',
+  '''.opencode/''',
+]

@@ -290,6 +290,7 @@ npm ci
 | `make test` | Run unit tests |
 | `make test-watch` | Run tests in watch mode |
 | `make test-integration` | Run integration tests (needs live Gitea instance) |
+| `make scan` | Scan for leaked secrets with gitleaks (part of `make verify`) |
 | `make dev` | Run directly with tsx |
 
 For the full architecture — module layout, dependency graph, core patterns, and
