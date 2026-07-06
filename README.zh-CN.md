@@ -1,19 +1,45 @@
 # gitea-mcp
 
-[English](https://github.com/amonstack/gitea_mcp/blob/master/README.md)
+[![npm version](https://img.shields.io/npm/v/@amonstack/gitea-mcp?logo=npm)](https://www.npmjs.com/package/@amonstack/gitea-mcp)
+[![license](https://img.shields.io/npm/l/@amonstack/gitea-mcp)](https://github.com/amonstack/gitea_mcp/blob/master/LICENSE)
+[![Node](https://img.shields.io/node/v/@amonstack/gitea-mcp?logo=node.js)](https://www.npmjs.com/package/@amonstack/gitea-mcp)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![MCP](https://img.shields.io/badge/MCP-server-6f42c1?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
 
-> 让 AI 助手通过 MCP 协议管理 Gitea 仓库 —— 议题、标签、里程碑、评论等功能，
-> 全部通过 Gitea API 实现。
+MCP 服务端，将 Gitea 的议题、标签、里程碑与评论封装为工具，供 AI 助手调用。
 
-## 这是什么？
+[English](https://github.com/amonstack/gitea_mcp/blob/master/README.md) | **中文文档**
 
-`gitea-mcp` 是一个 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-服务端，将 Gitea 仓库操作暴露为 MCP 工具。连接到 MCP 客户端（Claude Desktop、
-opencode、Cursor 等）后，AI 助手即可通过自然语言在 Gitea 实例上创建、查询、
-更新和删除议题、标签、里程碑和评论。
+`gitea-mcp` 是一个 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 服务端，将 Gitea 仓库操作暴露为 MCP 工具。连接到 MCP 客户端（Claude Desktop、opencode、Cursor 等）后，AI 助手即可通过自然语言在 Gitea 实例上创建、查询、更新和删除议题、标签、里程碑和评论。
 
-服务端通过 stdio 通信，封装了 [Gitea REST API
-(`/api/v1`)](https://docs.gitea.com/api/1.22/)。
+服务端通过 stdio 通信，封装了 [Gitea REST API (`/api/v1`)](https://docs.gitea.com/api/1.22/)。
+
+## 功能特性
+
+- **完整的 Gitea 项目管理** —— 通过自然语言管理议题、标签、里程碑与评论
+- **零配置自动发现** —— 从项目 git 配置读取 `baseUrl`、`owner`、`repo` 与令牌；一次全局安装即可服务多个仓库
+- **多来源认证 + 自动容错** —— 依次尝试 `[gitea]` 配置令牌、`GITEA_TOKEN`、git 凭据存储，遇 `401`/`403` 自动切换
+- **按动作划分的技能** —— 每个工作流一个技能（查找、创建、打标签、评论、规划里程碑……），适配 opencode、Claude Code、Cursor 等
+- **客户端无关** —— 兼容任何基于 stdio 的 MCP 客户端；同时内置引导提示与按需参考资源
+
+## 目录
+
+- [功能特性](#功能特性)
+- [环境要求](#环境要求)
+- [安装](#安装)
+- [配置](#配置)
+- [MCP 客户端配置](#mcp-客户端配置)
+- [可用工具](#可用工具)
+- [AI 引导与技能](#ai-引导与技能)
+- [二次开发](#二次开发)
+- [参与贡献](#参与贡献)
+- [许可证](#许可证)
+
+## 环境要求
+
+- **Node.js ≥ 18** —— 使用全局 `fetch`
+- 一个可通过 HTTP 访问的 **Gitea 实例**（自托管或 Gitea Cloud）
+- 一个 **Gitea API 令牌**（或 git 凭据存储条目），用于读取公开仓库以外的操作
 
 ## 安装
 
@@ -306,6 +332,14 @@ npm ci
 完整的架构说明（模块布局、依赖关系、核心模式，以及新增工具的指引）请参阅
 [`docs/architecture.md`](docs/architecture.md)。
 
+## 参与贡献
+
+欢迎贡献！
+
+- 发现 bug 或有功能建议？请[提交一个 issue](https://github.com/amonstack/gitea_mcp/issues)。
+- 欢迎提交 Pull Request。本仓库遵循 [Conventional Commits](https://www.conventionalcommits.org/)，工作流见 [`AGENTS.md`](AGENTS.md) —— 首次 PR 前请先浏览一遍。
+- 模块布局、依赖关系、核心模式以及新增工具的指引，请参阅 [`docs/architecture.md`](docs/architecture.md)。
+
 ## 许可证
 
-MIT
+[MIT](LICENSE) —— 版权所有 (c) 2026 [amonstack](https://github.com/amonstack)。

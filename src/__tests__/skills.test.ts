@@ -6,7 +6,7 @@ import { join } from "node:path";
 describe("parseInitArgs", () => {
   it("defaults tool to opencode", async () => {
     const { parseInitArgs } = await import("../skills.js");
-    expect(parseInitArgs([])).toEqual({ tool: "opencode", project: false });
+    expect(parseInitArgs([])).toEqual({ tool: "opencode", project: false, help: false });
   });
 
   it("parses --tool value and --tool= form", async () => {
@@ -41,9 +41,12 @@ describe("parseInitArgs", () => {
     expect(() => parseInitArgs(["--bogus"])).toThrow("Unknown argument");
   });
 
-  it("shows usage on --help", async () => {
+  it("sets help=true on -h / --help and stops parsing", async () => {
     const { parseInitArgs } = await import("../skills.js");
-    expect(() => parseInitArgs(["--help"])).toThrow("gitea-mcp init");
+    expect(parseInitArgs(["--help"]).help).toBe(true);
+    expect(parseInitArgs(["-h"]).help).toBe(true);
+    // help short-circuits: later args are not validated
+    expect(parseInitArgs(["--help", "--bogus"]).help).toBe(true);
   });
 });
 
@@ -158,6 +161,21 @@ describe("runInitCommand", () => {
     await expect(runInitCommand(["--tool", "nope", "--dir", "/tmp"])).rejects.toThrow(
       "Unsupported tool: nope",
     );
+  });
+
+  it("prints usage to stdout and resolves (exit 0) on --help / -h", async () => {
+    const { runInitCommand, USAGE } = await import("../skills.js");
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runInitCommand(["--help"])).resolves.toBeUndefined();
+    await expect(runInitCommand(["-h"])).resolves.toBeUndefined();
+
+    const out = writeSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+    expect(out).toContain(USAGE);
+    // usage printed exactly twice (once per call)
+    expect(out.split(USAGE).length).toBe(3);
+
+    writeSpy.mockRestore();
   });
 });
 

@@ -1,20 +1,45 @@
 # gitea-mcp
 
-[中文文档](https://github.com/amonstack/gitea_mcp/blob/master/README.zh-CN.md)
+[![npm version](https://img.shields.io/npm/v/@amonstack/gitea-mcp?logo=npm)](https://www.npmjs.com/package/@amonstack/gitea-mcp)
+[![license](https://img.shields.io/npm/l/@amonstack/gitea-mcp)](https://github.com/amonstack/gitea_mcp/blob/master/LICENSE)
+[![Node](https://img.shields.io/node/v/@amonstack/gitea-mcp?logo=node.js)](https://www.npmjs.com/package/@amonstack/gitea-mcp)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![MCP](https://img.shields.io/badge/MCP-server-6f42c1?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
 
-> MCP server that lets AI assistants manage Gitea repositories — issues, labels,
-> milestones, comments, and more via the Gitea API.
+MCP server that exposes Gitea issues, labels, milestones, and comments as tools for AI assistants.
 
-## What is gitea-mcp?
+**English** | [中文文档](https://github.com/amonstack/gitea_mcp/blob/master/README.zh-CN.md)
 
-`gitea-mcp` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-server that exposes Gitea repository operations as tools. Once connected to an
-MCP client (Claude Desktop, opencode, Cursor, etc.), an AI assistant can list,
-create, update, and delete issues, labels, milestones, and comments on your
-Gitea instance — all through natural language.
+`gitea-mcp` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes Gitea repository operations as tools. Once connected to an MCP client (Claude Desktop, opencode, Cursor, etc.), an AI assistant can list, create, update, and delete issues, labels, milestones, and comments on your Gitea instance — all through natural language.
 
-The server communicates over stdio and wraps the [Gitea REST API
-(`/api/v1`)](https://docs.gitea.com/api/1.22/).
+The server communicates over stdio and wraps the [Gitea REST API (`/api/v1`)](https://docs.gitea.com/api/1.22/).
+
+## Features
+
+- **Full Gitea project management** — issues, labels, milestones, and comments via natural language
+- **Zero-config auto-discovery** — reads `baseUrl`, `owner`, `repo`, and token from the project's git config; one global install serves many repos
+- **Multi-source auth with failover** — tries `[gitea]` config tokens, `GITEA_TOKEN`, then the git credential store, advancing automatically on `401`/`403`
+- **Action-scoped skills** — ships one skill per workflow (find, create, label, comment, plan milestones, …) for opencode, Claude Code, Cursor, and more
+- **Client-agnostic** — works with any stdio-based MCP client; ships guidance prompts and on-demand reference resources too
+
+## Table of Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [MCP Client Setup](#mcp-client-setup)
+- [Available Tools](#available-tools)
+- [AI Guidance & Skills](#ai-guidance--skills)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Requirements
+
+- **Node.js ≥ 18** — uses the global `fetch`
+- A **Gitea instance** (self-hosted or Gitea Cloud) reachable over HTTP
+- A **Gitea API token** (or a git credential-store entry) for anything beyond reading public repositories
 
 ## Installation
 
@@ -324,6 +349,14 @@ npm ci
 For the full architecture — module layout, dependency graph, core patterns, and
 the guide to adding a new tool — see [`docs/architecture.md`](docs/architecture.md).
 
+## Contributing
+
+Contributions are welcome!
+
+- Found a bug or have a feature idea? Please [open an issue](https://github.com/amonstack/gitea_mcp/issues).
+- Pull requests are gladly accepted. This repo follows [Conventional Commits](https://www.conventionalcommits.org/) and the workflow described in [`AGENTS.md`](AGENTS.md) — please skim it before your first PR.
+- For the module layout, dependency graph, and the guide to adding a new tool, see [`docs/architecture.md`](docs/architecture.md).
+
 ## License
 
-MIT
+[MIT](LICENSE) — Copyright (c) 2026 [amonstack](https://github.com/amonstack).

@@ -19,6 +19,7 @@ const SKIP_PREFIX = "gitea-mcp: no git remote found in";
 describe("cli entry point", () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let errSpy: ReturnType<typeof vi.spyOn>;
+  let outSpy: ReturnType<typeof vi.spyOn>;
   let savedArgv: string[];
 
   beforeEach(() => {
@@ -31,6 +32,7 @@ describe("cli entry point", () => {
         throw new Error(`process.exit(${code})`);
       }) as never);
     errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    outSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     vi.mocked(runServer).mockReset();
     vi.mocked(discoverConfig).mockReset();
   });
@@ -120,5 +122,47 @@ describe("cli entry point", () => {
       expect(errSpy).toHaveBeenCalledWith("Fatal error:", expect.any(Error));
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
+  });
+
+  it("prints top-level usage and exits 0 on --help", async () => {
+    process.argv = ["node", "cli.js", "--help"];
+    await expect(import("../cli.js")).rejects.toThrow("process.exit(0)");
+    const out = outSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+    expect(out).toContain("Usage: gitea-mcp");
+    expect(out).toContain("Commands:");
+    expect(out).toContain("init");
+    expect(out).toContain("-h, --help");
+    expect(runServer).not.toHaveBeenCalled();
+    expect(discoverConfig).not.toHaveBeenCalled();
+  });
+
+  it("prints top-level usage and exits 0 on -h", async () => {
+    process.argv = ["node", "cli.js", "-h"];
+    await expect(import("../cli.js")).rejects.toThrow("process.exit(0)");
+    expect(outSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("")).toContain("Usage: gitea-mcp");
+    expect(runServer).not.toHaveBeenCalled();
+  });
+
+  it("prints top-level usage and exits 0 on help subcommand", async () => {
+    process.argv = ["node", "cli.js", "help"];
+    await expect(import("../cli.js")).rejects.toThrow("process.exit(0)");
+    expect(outSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("")).toContain("Usage: gitea-mcp");
+    expect(discoverConfig).not.toHaveBeenCalled();
+  });
+
+  it("prints version and exits 0 on --version", async () => {
+    process.argv = ["node", "cli.js", "--version"];
+    await expect(import("../cli.js")).rejects.toThrow("process.exit(0)");
+    const out = outSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+    expect(out).toMatch(/gitea-mcp \d+\.\d+\.\d+/);
+    expect(runServer).not.toHaveBeenCalled();
+    expect(discoverConfig).not.toHaveBeenCalled();
+  });
+
+  it("prints version and exits 0 on -V", async () => {
+    process.argv = ["node", "cli.js", "-V"];
+    await expect(import("../cli.js")).rejects.toThrow("process.exit(0)");
+    expect(outSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("")).toMatch(/gitea-mcp \d+\.\d+\.\d+/);
+    expect(runServer).not.toHaveBeenCalled();
   });
 });

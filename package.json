@@ -1,7 +1,7 @@
 {
   "name": "@amonstack/gitea-mcp",
   "version": "0.0.0",
-  "description": "MCP server for managing Gitea issues via API",
+  "description": "MCP server that exposes Gitea issues, labels, milestones, and comments as tools for AI assistants",
   "repository": {
     "type": "git",
     "url": "https://github.com/amonstack/gitea_mcp.git"

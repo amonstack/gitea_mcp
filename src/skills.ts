@@ -7,11 +7,18 @@ const BUNDLED_SKILLS_REL = ["assets", "skills"] as const;
 const SKILL_FILENAME = "SKILL.md";
 const DEFAULT_TOOL = "opencode";
 
-const USAGE = `Usage: gitea-mcp init [--tool <name>] [--project] [--dir <path>]
-  --tool <name>  target AI tool (default: ${DEFAULT_TOOL})
-  --project      install into ./.<tool>/skills/ instead of the tool's global skills dir
-  --dir <path>   install into this exact directory (overrides --tool and --project)
-Supported tools:
+export const USAGE = `Usage: gitea-mcp init [options]
+
+Copy every bundled action skill into an AI tool's skills directory so the tool
+loads them on next start. No Gitea credentials are required.
+
+Options:
+  -h, --help        Show this help and exit.
+  --tool <name>     Target AI tool (default: ${DEFAULT_TOOL}).
+  --project         Install into ./.<tool>/skills/ instead of its global skills dir.
+  --dir <path>      Install into this exact directory (overrides --tool and --project).
+
+Supported tools (<name>):
   amazon-q, antigravity, auggie, claude, cline, codex, codebuddy, continue,
   costrict, crush, cursor, factory, gemini, github-copilot, iflow, kilocode,
   opencode, qoder, qwen, roocode, windsurf`;
@@ -20,6 +27,8 @@ export interface InitOptions {
   tool: string;
   project: boolean;
   dir?: string;
+  /** Set by parseInitArgs when `-h` / `--help` is passed; runInitCommand prints usage and exits 0. */
+  help?: boolean;
 }
 
 /** A supported target tool and where its skills live. */
@@ -104,12 +113,17 @@ export function resolveInstallDir(opts: InitOptions): string {
   return target.globalSkillsDir();
 }
 
-/** Parse `gitea-mcp init [flags]`. Throws on unknown flags or missing values. */
+/** Parse `gitea-mcp init [flags]`. Throws on unknown flags or missing values.
+ *  `-h` / `--help` is returned as `opts.help = true` (not thrown) so the caller
+ *  can print usage to stdout and exit 0 instead of treating it as an error. */
 export function parseInitArgs(argv: string[]): InitOptions {
-  const opts: InitOptions = { tool: DEFAULT_TOOL, project: false };
+  const opts: InitOptions = { tool: DEFAULT_TOOL, project: false, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--project") {
+    if (a === "--help" || a === "-h") {
+      opts.help = true;
+      break;
+    } else if (a === "--project") {
       opts.project = true;
     } else if (a === "--tool") {
       const val = argv[++i];
@@ -123,8 +137,6 @@ export function parseInitArgs(argv: string[]): InitOptions {
       opts.dir = val;
     } else if (a.startsWith("--dir=")) {
       opts.dir = a.slice("--dir=".length);
-    } else if (a === "--help" || a === "-h") {
-      throw new Error(USAGE);
     } else {
       throw new Error(`Unknown argument: ${a}\n${USAGE}`);
     }
@@ -191,6 +203,10 @@ export async function installSkills(srcDir: string, destRoot: string): Promise<s
  */
 export async function runInitCommand(argv: string[]): Promise<void> {
   const opts = parseInitArgs(argv);
+  if (opts.help) {
+    process.stdout.write(USAGE + "\n");
+    return;
+  }
   const target = resolveTool(opts.tool);
   const destRoot = resolveInstallDir(opts);
 
