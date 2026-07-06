@@ -40,10 +40,6 @@ describe("credentials — orderSchemesForCredentialStore", () => {
     expect(orderSchemesForCredentialStore("x-oauth-basic")).toEqual(["token", "basic"]);
   });
 
-  it("returns [token, basic] for an empty username", () => {
-    expect(orderSchemesForCredentialStore("")).toEqual(["token", "basic"]);
-  });
-
   it("returns [token, basic] when username is undefined", () => {
     expect(orderSchemesForCredentialStore(undefined)).toEqual(["token", "basic"]);
   });
@@ -114,18 +110,19 @@ describe("credentials — pickNextAttempt", () => {
     expect(pickNextAttempt([])).toBeNull();
   });
 
-  it("surfaces an active candidate with its locked scheme", () => {
+  it("skips an active candidate (caller handles it before the iteration loop)", () => {
     const candidates = [
       makeCandidate({ status: "active", activeScheme: "basic" }),
     ];
-    expect(pickNextAttempt(candidates)).toEqual({ candidateIndex: 0, scheme: "basic" });
+    // Active candidates are already locked — there is nothing new to pick.
+    expect(pickNextAttempt(candidates)).toBeNull();
   });
 
-  it("surfaces an active candidate with its first scheme when activeScheme is unset", () => {
+  it("skips an active candidate even when activeScheme is unset", () => {
     const candidates = [
       makeCandidate({ status: "active", activeScheme: undefined, schemes: ["token"] }),
     ];
-    expect(pickNextAttempt(candidates)).toEqual({ candidateIndex: 0, scheme: "token" });
+    expect(pickNextAttempt(candidates)).toBeNull();
   });
 });
 
@@ -327,11 +324,12 @@ describe("credentials — iteration sequence (end-to-end)", () => {
     expect(second).toEqual({ candidateIndex: 1, scheme: "basic" });
     markAttemptSucceeded(candidates, second.candidateIndex, second.scheme);
 
-    // After success, pickNextAttempt returns the active candidate only.
-    expect(pickNextAttempt(candidates)).toEqual({ candidateIndex: 1, scheme: "basic" });
+    // After success, active candidates are skipped by pickNextAttempt
+    // (the caller handles them before the loop). The next pending
+    // candidate is returned instead.
+    expect(pickNextAttempt(candidates)).toEqual({ candidateIndex: 2, scheme: "token" });
     expect(candidates[0].status).toBe("exhausted");
     expect(candidates[1].status).toBe("active");
-    // Candidate 2 was never tried and stays pending.
     expect(candidates[2].status).toBe("pending");
   });
 });

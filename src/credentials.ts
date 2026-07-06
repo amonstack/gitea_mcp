@@ -97,7 +97,7 @@ export interface Attempt {
 export function orderSchemesForCredentialStore(username?: string): AuthScheme[] {
   if (username === undefined) return ["token", "basic"];
   const u = username.toLowerCase();
-  if (u === "oauth2" || u === "x-oauth-basic" || u === "") {
+  if (u === "oauth2" || u === "x-oauth-basic") {
     return ["token", "basic"];
   }
   return ["basic", "token"];
@@ -131,13 +131,10 @@ export function pickNextAttempt(candidates: CandidateCredential[]): Attempt | nu
   for (let i = 0; i < candidates.length; i++) {
     const c = candidates[i];
     if (c.status === "exhausted") continue;
-    if (c.status === "active") {
-      // An active candidate with a locked scheme should be used directly by
-      // the caller; this function is only for re-iteration after failure.
-      // If we reach here it means prior candidates were exhausted and we
-      // should keep using the active one — surface it.
-      return { candidateIndex: i, scheme: c.activeScheme ?? c.schemes[0] };
-    }
+    // Active candidates are already locked — the caller short-circuits
+    // before entering this iteration loop (GiteaClient.request checks
+    // findActiveCandidateIndex first). Here we skip them defensively.
+    if (c.status === "active") continue;
     if (c.nextSchemeIndex >= c.schemes.length) continue;
     return { candidateIndex: i, scheme: c.schemes[c.nextSchemeIndex] };
   }
