@@ -188,3 +188,5 @@ export const ListMyReposSchema = z.object({
   page: z.number().int().min(1).optional().describe("Page number"),
   limit: z.number().int().min(1).max(100).optional().describe("Results per page"),
 });
+
+export const GiteaStatusSchema = z.object({});

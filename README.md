@@ -59,7 +59,7 @@ projects. Set them only to override the discovery.
 | Variable | Required | Description |
 |----------|:--------:|-------------|
 | `GITEA_BASE_URL` | No | Gitea instance URL (e.g. `https://gitea.example.com`). Auto-detected from the project's git remote when omitted. |
-| `GITEA_TOKEN` | No | Gitea API access token. Resolved from `.git/config`, the git credential store, then this variable (see [Token discovery](#token-discovery)). |
+| `GITEA_TOKEN` | No | Gitea API access token. One of several auth candidates; tried after a `.git/config [gitea]` token and before the git credential store (see [Token discovery](#token-discovery)). |
 | `GITEA_DEFAULT_OWNER` | No | Default repository owner — skip passing `owner` on every call |
 | `GITEA_DEFAULT_REPO` | No | Default repository name — skip passing `repo` on every call |
 
@@ -80,21 +80,48 @@ repository, or set `GITEA_BASE_URL` / `GITEA_TOKEN` explicitly.
 
 ### Token discovery
 
-The token is resolved in this order (first match wins):
+`gitea-mcp` collects authentication **candidates** from three sources, in this
+priority order:
 
-1. A `[gitea "<baseUrl>"]` section in `.git/config`:
+1. A `[gitea "<baseUrl>"]` section in `.git/config` (a bare `[gitea]` section is
+   a host-wide fallback):
    ```ini
    [gitea "https://gitea.example.com"]
        token = <your-token>
    ```
-   A bare `[gitea]` section with `token = ...` is a host-wide fallback.
-2. The git credential store (`~/.git-credentials`, or `$XDG_CONFIG_HOME/git/credentials`) —
-   a line whose host matches the instance, e.g. `https://oauth2:<token>@gitea.example.com`.
-3. The `GITEA_TOKEN` environment variable.
+   Always sent as `Authorization: token <token>`.
+2. The `GITEA_TOKEN` environment variable — also sent as `Authorization: token`.
+3. The git credential store (`~/.git-credentials`, or
+   `$XDG_CONFIG_HOME/git/credentials`) — every line whose host matches the
+   instance, e.g. `https://alice:s3cret@gitea.example.com`. When several lines
+   match, the one whose path best matches `owner/repo` is tried first.
 
-If none resolves, the server still starts without a token (anonymous). Public repositories
-may be read; private repos and write operations return `401` — use the `gitea-configure`
-skill to guide setup, or set `GITEA_TOKEN`.
+A credential-store entry's `password` field may hold a real PAT, an account
+password, or an OAuth token — git stores whatever was typed at the prompt, and
+the server cannot tell them apart statically. So each credential-store entry is
+tried under **two authentication schemes**:
+
+- `Authorization: Basic <base64(user:pass)>` — works for account passwords and
+  PATs alike (Gitea checks that the username matches the secret's owner).
+- `Authorization: token <secret>` — works only for real PATs.
+
+The order is chosen by a username heuristic: a convention username
+(`oauth2`, `x-oauth-basic`, or empty) tries `token` first; a real-looking
+username (e.g. `alice`) tries `basic` first.
+
+**Fault tolerance.** On `401`/`403` the server advances to the next
+scheme/candidate and retries the same request; once a combination succeeds it is
+locked for the rest of the session (no re-probing). Non-auth errors (`404`,
+`500`, network) propagate immediately and do **not** trigger a retry.
+
+**Diagnostics.** The `gitea_status` tool (see [Repository Helpers](#repository-helpers))
+returns a redacted view of the current state — which candidate is active, which
+are exhausted, the last status seen — without ever exposing the secret. Use it
+to troubleshoot a `401` instead of guessing.
+
+If no source resolves a credential, the server still starts anonymously. Public
+repositories may be read; private repos and write operations return `401` — use
+the `gitea-configure` skill to guide setup, or set `GITEA_TOKEN`.
 
 When `GITEA_DEFAULT_OWNER` and `GITEA_DEFAULT_REPO` are set, you can omit the
 `owner` and `repo` parameters in tool calls. The `resolve_repo` tool can also
@@ -234,6 +261,7 @@ gitea-mcp
 |------|-------------|
 | `list_my_repos` | List repositories accessible to the authenticated user |
 | `resolve_repo` | Detect `baseUrl`, `owner`, and `repo` from the project's git remotes (`upstream` preferred, then `origin`) |
+| `gitea_status` | Inspect credential-handling state — active candidate, exhausted candidates, last error (redacted; secrets never exposed) |
 
 ## AI Guidance & Skills
 

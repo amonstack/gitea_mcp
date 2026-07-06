@@ -57,7 +57,7 @@ beforeEach(async () => {
 describe("server instructions (handshake guidance)", () => {
   it("loads instructions.md into the server and it carries the core strategy", async () => {
     const { createServer } = await import("../server.js");
-    const server = await createServer("https://g", "t");
+    const server = await createServer("https://g");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const instructions = (server as any).server._instructions as string | undefined;
     expect(typeof instructions).toBe("string");
@@ -69,7 +69,7 @@ describe("server instructions (handshake guidance)", () => {
 describe("enriched tool descriptions", () => {
   it("every registered tool has a substantive description (>40 chars)", async () => {
     const { createServer } = await import("../server.js");
-    const server = await createServer("https://g", "t", "o", "r");
+    const server = await createServer("https://g", undefined, "o", "r");
     for (const [name, tool] of Object.entries(toolsOf(server))) {
       expect(tool.description.length, `${name} description too short`).toBeGreaterThan(40);
     }
@@ -77,7 +77,7 @@ describe("enriched tool descriptions", () => {
 
   it("flags the critical risk on each high-risk tool", async () => {
     const { createServer } = await import("../server.js");
-    const server = await createServer("https://g", "t", "o", "r");
+    const server = await createServer("https://g", undefined, "o", "r");
     const d = (n: string) => toolsOf(server)[n].description;
     expect(d("update_issue")).toContain("REPLACE"); // labels replace whole set
     expect(d("delete_issue")).toContain("IRREVERSIBLE");
@@ -100,7 +100,7 @@ describe("workflow prompts", () => {
 
   it("registers all four prompts with descriptions", async () => {
     const { createServer } = await import("../server.js");
-    const server = await createServer("https://g", "t", "o", "r");
+    const server = await createServer("https://g", undefined, "o", "r");
     const prompts = promptsOf(server);
     for (const name of PROMPTS) {
       expect(prompts[name], `missing prompt ${name}`).toBeDefined();
@@ -110,7 +110,7 @@ describe("workflow prompts", () => {
 
   it("each prompt returns a user text message with actionable guidance", async () => {
     const { createServer } = await import("../server.js");
-    const server = await createServer("https://g", "t", "o", "r");
+    const server = await createServer("https://g", undefined, "o", "r");
     const prompts = promptsOf(server);
     const cases: Array<[string, Record<string, unknown>]> = [
       ["triage_issues", {}],
@@ -140,7 +140,7 @@ describe("reference resources", () => {
 
   it("registers all three resources", async () => {
     const { createServer } = await import("../server.js");
-    const server = await createServer("https://g", "t", "o", "r");
+    const server = await createServer("https://g", undefined, "o", "r");
     const resources = resourcesOf(server);
     for (const uri of RESOURCES) {
       expect(resources[uri], `missing resource ${uri}`).toBeDefined();
@@ -149,7 +149,7 @@ describe("reference resources", () => {
 
   it("each resource reads non-empty markdown from the bundled assets", async () => {
     const { createServer } = await import("../server.js");
-    const server = await createServer("https://g", "t", "o", "r");
+    const server = await createServer("https://g", undefined, "o", "r");
     const resources = resourcesOf(server);
     for (const uri of RESOURCES) {
       const result = (await resources[uri].readCallback(new URL(uri), {})) as {

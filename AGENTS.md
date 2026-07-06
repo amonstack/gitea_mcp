@@ -143,7 +143,7 @@ Violation Signals (each pattern below indicates a breach of the rules above):
 
 - MUST NOT commit secrets, credentials, API keys, tokens, or private data to the repository.
 - MUST NOT hardcode secrets in source code or config; secrets MUST be read from the environment (`GITEA_TOKEN`, `NPM_TOKEN`) and MUST stay outside version control (respect `.gitignore`).
-- The Gitea token is sent ONLY as an `Authorization: token <token>` header inside `GiteaClient.request`; it MUST NOT be logged, interpolated into error messages returned to the MCP client, or echoed in tool output.
+- The Gitea credential (token or credential-store secret) is sent ONLY inside the `Authorization` header of `GiteaClient.request`, in one of two schemes: `Authorization: token <token>` (for `[gitea]` config tokens and `GITEA_TOKEN`) or `Authorization: Basic base64(<username>:<secret>)` (for git credential-store entries, whose `password` field may be an account password or a PAT). The scheme is chosen by the credential state machine in `credentials.ts` / `gitea-client.ts` (see `docs/architecture.md` §5.3). It MUST NOT be logged, interpolated into error messages returned to the MCP client, or echoed in tool output; the `gitea_status` diagnostic tool exposes only `secretPresent: boolean` and a masked username.
 - If a committed secret is discovered, treat it as exposed and rotate it; do not merely delete the line.
 
 Violation Signals (each pattern below indicates a breach of the rules above):

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { GiteaClient } from "../gitea-client.js";
+import { GiteaClient, GiteaApiError } from "../gitea-client.js";
+import type { CandidateCredential } from "../credentials.js";
 
 interface FakeResponse {
   ok: boolean;
@@ -372,6 +373,218 @@ describe("GiteaClient", () => {
       const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
       await client.listMyRepos();
       expect(lastCall(fetchMock).url).toBe("https://g/api/v1/user/repos");
+    });
+  });
+
+  describe("multi-candidate auth state machine", () => {
+    /** Build a candidate with sane defaults. */
+    function candidate(overrides: Partial<CandidateCredential>): CandidateCredential {
+      return {
+        source: "env",
+        secret: "sekrit",
+        schemes: ["token"],
+        status: "pending",
+        nextSchemeIndex: 0,
+        ...overrides,
+      };
+    }
+
+    /** Sequence of responses returned one per fetch call. */
+    function stubFetchSequence(...responses: FakeResponse[]) {
+      const fetchMock = vi.fn();
+      responses.forEach((r) => fetchMock.mockResolvedValueOnce(r));
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+
+    /** Response that inspects the Authorization header and picks a status. */
+    function authAwareResponse(
+      handler: (authHeader: string | undefined) => FakeResponse,
+    ): { response: FakeResponse; fetchMock: ReturnType<typeof vi.fn> } {
+      const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        const headers = init.headers as Record<string, string>;
+        return Promise.resolve(handler(headers["Authorization"]));
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      // A stable single response object is not required; return a placeholder.
+      return { response: buildResponse({}), fetchMock };
+    }
+
+    it("advances to the next candidate when the first returns 401", async () => {
+      const fetchMock = stubFetchSequence(
+        buildResponse("unauthorized", 401, "Unauthorized"),
+        buildResponse({ id: 1 }),
+      );
+      const client = new GiteaClient({
+        baseUrl: "https://g",
+        candidates: [
+          candidate({ source: "env", secret: "bad", schemes: ["token"] }),
+          candidate({ source: "credential-store", secret: "good", schemes: ["token"] }),
+        ],
+      });
+      const issue = await client.getIssue("o", "r", 1);
+      expect(issue).toEqual({ id: 1 });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      // First attempt used the bad candidate.
+      const firstHeaders = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+      expect(firstHeaders["Authorization"]).toBe("token bad");
+      // Second attempt used the good candidate.
+      const secondHeaders = fetchMock.mock.calls[1][1].headers as Record<string, string>;
+      expect(secondHeaders["Authorization"]).toBe("token good");
+    });
+
+    it("throws GiteaApiError(401) when all candidates are exhausted", async () => {
+      stubFetchSequence(
+        buildResponse("unauthorized", 401, "Unauthorized"),
+        buildResponse("forbidden", 403, "Forbidden"),
+      );
+      const client = new GiteaClient({
+        baseUrl: "https://g",
+        candidates: [
+          candidate({ secret: "a", schemes: ["token"] }),
+          candidate({ secret: "b", schemes: ["token"] }),
+        ],
+      });
+      await expect(client.getIssue("o", "r", 1)).rejects.toMatchObject({
+        name: "GiteaApiError",
+        status: 403,
+      });
+    });
+
+    it("swaps schemes within a single credential (basic 401 → token 200)", async () => {
+      const { fetchMock } = authAwareResponse((auth) => {
+        // Basic auth is rejected; token auth is accepted.
+        if (auth?.startsWith("Basic ")) return buildResponse("no", 401, "Unauthorized");
+        return buildResponse({ id: 7 });
+      });
+      const client = new GiteaClient({
+        baseUrl: "https://g",
+        candidates: [
+          // Real-looking username → schemes ordered [basic, token].
+          candidate({
+            source: "credential-store",
+            username: "alice",
+            secret: "pw",
+            schemes: ["basic", "token"],
+          }),
+        ],
+      });
+      const issue = await client.getIssue("o", "r", 7);
+      expect(issue).toEqual({ id: 7 });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const firstAuth = (fetchMock.mock.calls[0][1].headers as Record<string, string>)["Authorization"];
+      const secondAuth = (fetchMock.mock.calls[1][1].headers as Record<string, string>)["Authorization"];
+      expect(firstAuth.startsWith("Basic ")).toBe(true);
+      expect(secondAuth).toBe("token pw");
+    });
+
+    it("reuses the active candidate on the second call without re-iterating", async () => {
+      const fetchMock = stubFetchSequence(
+        buildResponse({ id: 1 }),
+        buildResponse({ id: 2 }),
+      );
+      const client = new GiteaClient({
+        baseUrl: "https://g",
+        candidates: [candidate({ secret: "tok", schemes: ["token"] })],
+      });
+      await client.getIssue("o", "r", 1);
+      await client.getIssue("o", "r", 2);
+      // Exactly 2 fetches — no retry on the second call.
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const secondHeaders = fetchMock.mock.calls[1][1].headers as Record<string, string>;
+      expect(secondHeaders["Authorization"]).toBe("token tok");
+    });
+
+    it("does NOT retry on a 404 (non-auth error propagates immediately)", async () => {
+      const fetchMock = stubFetchSequence(buildResponse("not found", 404, "Not Found"));
+      const client = new GiteaClient({
+        baseUrl: "https://g",
+        candidates: [
+          candidate({ secret: "a", schemes: ["token"] }),
+          candidate({ secret: "b", schemes: ["token"] }),
+        ],
+      });
+      await expect(client.getIssue("o", "r", 1)).rejects.toThrow(
+        "Gitea API error (404): not found",
+      );
+      // Only one fetch — 404 is not an auth error.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT retry on a 500 (server error propagates immediately)", async () => {
+      const fetchMock = stubFetchSequence(buildResponse("boom", 500, "Internal Server Error"));
+      const client = new GiteaClient({
+        baseUrl: "https://g",
+        candidates: [candidate({ secret: "a", schemes: ["token"] })],
+      });
+      await expect(client.getIssue("o", "r", 1)).rejects.toMatchObject({ status: 500 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("getCredentialStatus returns redacted state with no raw secret", async () => {
+      stubFetch(buildResponse({ id: 1 }));
+      const client = new GiteaClient({
+        baseUrl: "https://g",
+        candidates: [
+          candidate({
+            source: "credential-store",
+            username: "ake131998",
+            secret: "super-secret-value",
+            schemes: ["basic", "token"],
+          }),
+        ],
+      });
+      await client.getIssue("o", "r", 1);
+      const status = client.getCredentialStatus();
+      expect(status.totalCandidates).toBe(1);
+      expect(status.activeIndex).toBe(0);
+      const serialized = JSON.stringify(status);
+      expect(serialized).not.toContain("super-secret-value");
+      expect(status.candidates[0].secretPresent).toBe(true);
+      expect(status.candidates[0].username).toBe("a***");
+      expect(status.candidates[0].status).toBe("active");
+    });
+
+    it("getCredentialStatus reflects exhaustion after all attempts fail", async () => {
+      stubFetchSequence(
+        buildResponse("no", 401, "Unauthorized"),
+        buildResponse("no", 401, "Unauthorized"),
+      );
+      const client = new GiteaClient({
+        baseUrl: "https://g",
+        candidates: [
+          candidate({ secret: "a", schemes: ["token", "basic"] }),
+        ],
+      });
+      await expect(client.getIssue("o", "r", 1)).rejects.toMatchObject({ status: 401 });
+      const status = client.getCredentialStatus();
+      expect(status.activeIndex).toBeNull();
+      expect(status.candidates[0].status).toBe("exhausted");
+      expect(status.candidates[0].lastError).toBe("401");
+    });
+
+    it("makes anonymous requests when no candidates are configured", async () => {
+      const fetchMock = stubFetch(buildResponse({ id: 1 }));
+      const client = new GiteaClient({ baseUrl: "https://g" });
+      await client.getIssue("o", "r", 1);
+      const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+      expect(headers["Authorization"]).toBeUndefined();
+    });
+
+    it("preserves GiteaApiError status for branching without substring matching", async () => {
+      stubFetch(buildResponse("unauthorized", 401, "Unauthorized"));
+      const client = new GiteaClient({
+        baseUrl: "https://g",
+        candidates: [candidate({ secret: "a", schemes: ["token"] })],
+      });
+      let caught: unknown = null;
+      try {
+        await client.getIssue("o", "r", 1);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(GiteaApiError);
+      expect((caught as GiteaApiError).status).toBe(401);
     });
   });
 });

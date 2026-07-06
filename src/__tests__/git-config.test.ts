@@ -204,36 +204,50 @@ describe("readTokenFromGitConfig", () => {
 });
 
 describe("parseGitCredentials", () => {
-  it("returns the password for a matching host", () => {
-    expect(parseGitCredentials("https://oauth2:secret@gitea.example\n", "gitea.example")).toBe("secret");
+  it("returns username+password for a matching host", () => {
+    expect(parseGitCredentials("https://oauth2:secret@gitea.example\n", "gitea.example")).toEqual([
+      { username: "oauth2", password: "secret", host: "gitea.example", path: "" },
+    ]);
   });
 
-  it("returns the username when no password is set", () => {
-    expect(parseGitCredentials("https://tokenonly@gitea.example\n", "gitea.example")).toBe("tokenonly");
+  it("returns the entry with username only when no password is set", () => {
+    expect(parseGitCredentials("https://tokenonly@gitea.example\n", "gitea.example")).toEqual([
+      { username: "tokenonly", password: undefined, host: "gitea.example", path: "" },
+    ]);
   });
 
   it("skips entries for other hosts", () => {
-    expect(parseGitCredentials("https://oauth2:x@other.example\nhttps://oauth2:y@gitea.example\n", "gitea.example")).toBe("y");
+    expect(parseGitCredentials("https://oauth2:x@other.example\nhttps://oauth2:y@gitea.example\n", "gitea.example")).toEqual([
+      { username: "oauth2", password: "y", host: "gitea.example", path: "" },
+    ]);
   });
 
-  it("URL-decodes the token", () => {
-    expect(parseGitCredentials("https://oauth2:a%2Bb@gitea.example\n", "gitea.example")).toBe("a+b");
+  it("URL-decodes the password", () => {
+    expect(parseGitCredentials("https://oauth2:a%2Bb@gitea.example\n", "gitea.example")).toEqual([
+      { username: "oauth2", password: "a+b", host: "gitea.example", path: "" },
+    ]);
   });
 
   it("skips blank and comment lines", () => {
-    expect(parseGitCredentials("\n# a comment\nhttps://oauth2:z@gitea.example\n", "gitea.example")).toBe("z");
+    expect(parseGitCredentials("\n# a comment\nhttps://oauth2:z@gitea.example\n", "gitea.example")).toEqual([
+      { username: "oauth2", password: "z", host: "gitea.example", path: "" },
+    ]);
   });
 
   it("skips malformed lines", () => {
-    expect(parseGitCredentials("not-a-url\nhttps://oauth2:z@gitea.example\n", "gitea.example")).toBe("z");
+    expect(parseGitCredentials("not-a-url\nhttps://oauth2:z@gitea.example\n", "gitea.example")).toEqual([
+      { username: "oauth2", password: "z", host: "gitea.example", path: "" },
+    ]);
   });
 
-  it("returns undefined when nothing matches", () => {
-    expect(parseGitCredentials("https://x@other.example\n", "gitea.example")).toBeUndefined();
+  it("returns an empty array when nothing matches", () => {
+    expect(parseGitCredentials("https://x@other.example\n", "gitea.example")).toEqual([]);
   });
 
   it("matches a host with a port", () => {
-    expect(parseGitCredentials("https://oauth2:z@gitea.example:3000\n", "gitea.example:3000")).toBe("z");
+    expect(parseGitCredentials("https://oauth2:z@gitea.example:3000\n", "gitea.example:3000")).toEqual([
+      { username: "oauth2", password: "z", host: "gitea.example:3000", path: "" },
+    ]);
   });
 });
 
@@ -276,7 +290,6 @@ describe("discoverConfig", () => {
       defaultOwner: "upstream",
       defaultRepo: "repo",
       remote: "upstream",
-      source: "git",
     });
   });
 
@@ -296,7 +309,7 @@ describe("discoverConfig", () => {
     expect(cfg).toMatchObject({ baseUrl: "https://gitea.example" });
   });
 
-  it("reads the token from .git/config [gitea \"<baseUrl>\"] first", async () => {
+  it("places [gitea \"<baseUrl>\"] token first in candidates", async () => {
     mockFiles({
       "/repo/.git/config": [
         '[remote "origin"]', "\turl = https://gitea.example/owner/repo.git",
@@ -305,32 +318,34 @@ describe("discoverConfig", () => {
       "/cred": "https://oauth2:credtok@gitea.example\n",
     });
     const cfg = await discoverConfig({ cwd: "/repo", env: { GITEA_TOKEN: "envtok" }, credentialsPaths: ["/cred"] });
-    expect(cfg!.token).toBe("configtok");
+    expect(cfg!.candidates[0]).toMatchObject({ source: "gitea-config", secret: "configtok", schemes: ["token"] });
   });
 
-  it("falls back to the git credential store when .git/config has no token", async () => {
+  it("places GITEA_TOKEN before credential-store entries", async () => {
     mockFiles({
       "/repo/.git/config": '[remote "origin"]\n\turl = https://gitea.example/owner/repo.git\n',
       "/cred": "https://oauth2:credtok@gitea.example\n",
     });
     const cfg = await discoverConfig({ cwd: "/repo", env: { GITEA_TOKEN: "envtok" }, credentialsPaths: ["/cred"] });
-    expect(cfg!.token).toBe("credtok");
+    expect(cfg!.candidates[0]).toMatchObject({ source: "env", secret: "envtok", schemes: ["token"] });
+    expect(cfg!.candidates[1]).toMatchObject({ source: "credential-store", secret: "credtok" });
   });
 
-  it("falls back to GITEA_TOKEN when neither .git/config nor credentials resolve", async () => {
+  it("yields only the env candidate when no credential-store file matches", async () => {
     mockFiles({
       "/repo/.git/config": '[remote "origin"]\n\turl = https://gitea.example/owner/repo.git\n',
     });
     const cfg = await discoverConfig({ cwd: "/repo", env: { GITEA_TOKEN: "envtok" }, credentialsPaths: ["/cred"] });
-    expect(cfg!.token).toBe("envtok");
+    expect(cfg!.candidates).toHaveLength(1);
+    expect(cfg!.candidates[0]).toMatchObject({ source: "env", secret: "envtok" });
   });
 
-  it("leaves token undefined when no source resolves", async () => {
+  it("yields zero candidates when no source resolves", async () => {
     mockFiles({
       "/repo/.git/config": '[remote "origin"]\n\turl = https://gitea.example/owner/repo.git\n',
     });
     const cfg = await discoverConfig({ cwd: "/repo", env: {}, credentialsPaths: ["/cred"] });
-    expect(cfg!.token).toBeUndefined();
+    expect(cfg!.candidates).toEqual([]);
   });
 
   it("lets GITEA_BASE_URL override the derived baseUrl", async () => {
@@ -342,7 +357,7 @@ describe("discoverConfig", () => {
       env: { GITEA_BASE_URL: "https://gitea.override.example" },
       credentialsPaths: ["/cred"],
     });
-    expect(cfg).toMatchObject({ baseUrl: "https://gitea.override.example", source: "env" });
+    expect(cfg).toMatchObject({ baseUrl: "https://gitea.override.example" });
     // owner/repo still derived from the selected remote
     expect(cfg).toMatchObject({ defaultOwner: "owner", defaultRepo: "repo" });
   });
@@ -356,7 +371,8 @@ describe("discoverConfig", () => {
       env: { GITEA_BASE_URL: "https://gitea.example" },
       credentialsPaths: ["/cred"],
     });
-    expect(cfg).toMatchObject({ baseUrl: "https://gitea.example", token: "credmatch" });
+    expect(cfg).toMatchObject({ baseUrl: "https://gitea.example" });
+    expect(cfg!.candidates[0]).toMatchObject({ source: "credential-store", secret: "credmatch" });
   });
 
   it("lets GITEA_DEFAULT_OWNER/REPO override the derived values", async () => {

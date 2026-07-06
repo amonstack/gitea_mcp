@@ -1,6 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import {
+  type CandidateCredential,
+  type CredentialDiscoveryResult,
+  orderSchemesForCredentialStore,
+} from "./credentials.js";
 
 /** A single parsed git remote. `remote` is the remote name (`origin`, `upstream`, ...). */
 export interface ParsedRemote {
@@ -25,15 +30,22 @@ export interface DiscoverOptions {
   credentialsPaths?: string[];
 }
 
-export interface DiscoveredConfig {
-  baseUrl: string;
-  /** Undefined when no token source resolves — the server still starts and a Skill guides the user. */
-  token?: string;
-  defaultOwner?: string;
-  defaultRepo?: string;
-  /** Name of the remote the values were derived from (undefined when derived purely from env). */
-  remote?: string;
-  source: "env" | "git";
+/**
+ * A parsed `~/.git-credentials` line. Both `username` and `password` are
+ * URL-decoded. Either may be absent:
+ * - `https://user:pass@host` → both present
+ * - `https://:pass@host` → only password
+ * - `https://tok@host` → only username (git stores a token here when the
+ *   host accepts one as the "username"; the caller treats it as the secret)
+ *
+ * `path` is the URL pathname with leading/trailing slashes and any `.git`
+ * suffix stripped, used to narrow multiple host matches toward the target repo.
+ */
+export interface ParsedCredentialEntry {
+  username?: string;
+  password?: string;
+  host: string;
+  path: string;
 }
 
 /**
@@ -130,24 +142,54 @@ export function readTokenFromGitConfig(content: string, baseUrl: string): string
 }
 
 /**
- * Find a credential for `host` in a `git-credentials` file. Each line is a URL;
- * the password (preferred) or username is returned as the token. Malformed and
- * non-matching lines are skipped.
+ * Parse every credential-store line whose host matches. Each line is a URL of
+ * the form `protocol://[user[:pass]]@host[:port][/path]`; malformed and
+ * non-matching lines are skipped. Returns entries in file order; callers
+ * narrow and re-sort by repo path specificity.
+ *
+ * The `password` field — when present — holds whatever the user typed into
+ * git's password prompt: a real account password, a Personal Access Token,
+ * or an OAuth token. Git itself does not distinguish, and neither does this
+ * parser; the GiteaClient runtime tries each entry under multiple auth
+ * schemes to discover what works.
  */
-export function parseGitCredentials(content: string, host: string): string | undefined {
+export function parseGitCredentials(content: string, host: string): ParsedCredentialEntry[] {
+  const entries: ParsedCredentialEntry[] = [];
   for (const rawLine of content.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
     try {
       const credUrl = new URL(line);
       if (credUrl.host !== host) continue;
-      const tok = credUrl.password || credUrl.username;
-      if (tok) return decodeURIComponent(tok);
+      entries.push({
+        username: credUrl.username ? decodeURIComponent(credUrl.username) : undefined,
+        password: credUrl.password ? decodeURIComponent(credUrl.password) : undefined,
+        host: credUrl.host,
+        path: credUrl.pathname.replace(/^\/+|\/+$/g, "").replace(/\.git$/, ""),
+      });
     } catch {
       continue;
     }
   }
-  return undefined;
+  return entries;
+}
+
+/**
+ * Score a credential entry's path specificity against the target repo path
+ * (`owner/repo`). Higher = more specific. Used to narrow multiple host
+ * matches toward the most relevant entry first.
+ *
+ * - Path is empty (host-only entry) → 0
+ * - Path is a prefix of the repo path → length of the matching path
+ * - Path does not match → -1 (deprioritized but still tried as a fallback)
+ */
+function scoreEntryPath(entryPath: string, repoPath: string): number {
+  if (!entryPath) return 0;
+  if (!repoPath) return 0;
+  if (repoPath === entryPath || repoPath.startsWith(`${entryPath}/`)) {
+    return entryPath.length;
+  }
+  return -1;
 }
 
 /** Default credential-store paths: `$XDG_CONFIG_HOME/git/credentials` then `~/.git-credentials`. */
@@ -169,21 +211,62 @@ async function readOptionalFile(path: string): Promise<string> {
 }
 
 /**
+ * Build a `CandidateCredential` from a parsed credential-store entry.
+ *
+ * - `https://:pass@host` or `https://user:pass@host` → secret = pass,
+ *   username preserved (basic auth needs it).
+ * - `https://tok@host` (username but no password) → secret = tok, no
+ *   username: this is git's "store the token as the username" convention.
+ *   Try `token` first (most common), fall back to `basic`.
+ */
+function candidateFromEntry(entry: ParsedCredentialEntry): CandidateCredential | null {
+  if (entry.password) {
+    return {
+      source: "credential-store",
+      username: entry.username,
+      secret: entry.password,
+      schemes: orderSchemesForCredentialStore(entry.username),
+      status: "pending",
+      nextSchemeIndex: 0,
+    };
+  }
+  if (entry.username) {
+    return {
+      source: "credential-store",
+      secret: entry.username,
+      schemes: ["token", "basic"],
+      status: "pending",
+      nextSchemeIndex: 0,
+    };
+  }
+  return null;
+}
+
+/**
  * Discover the Gitea connection config from env + the local git context.
  *
  * baseUrl: `GITEA_BASE_URL` (env) wins; otherwise derived from the selected
  *   remote (`upstream` → `origin` → first). Returns null only when neither is
  *   available — callers should treat that as "do not start the server".
  *
- * token: `.git/config` `[gitea "<baseUrl>"] token` → bare `[gitea] token` →
- *   matching entry in a git credential store → `GITEA_TOKEN` (env). May be
- *   undefined when nothing resolves; the server still starts and a Skill
- *   guides the user to provide one.
+ * candidates (in priority order):
+ *   1. `[gitea "<baseUrl>"] token` / bare `[gitea] token` from `.git/config`
+ *      (explicit user configuration; `token` scheme only).
+ *   2. `GITEA_TOKEN` env var (explicit env; `token` scheme only — preserves
+ *      the simple-token semantics).
+ *   3. Every host-matching entry in a git credential store, narrowed by repo
+ *      path specificity (most specific first). Each entry may be a PAT,
+ *      password, or OAuth token; the client tries each under `basic` and/or
+ *      `token` schemes per the username heuristic.
  *
  * owner/repo: `GITEA_DEFAULT_OWNER`/`GITEA_DEFAULT_REPO` (env) win; otherwise
- *   taken from the selected remote.
+ * taken from the selected remote.
+ *
+ * The result may have an empty `candidates` array (anonymous mode); the server
+ * still starts and a Skill guides the user to provide one. Write tools will
+ * fail with 401/403 until a working credential is added.
  */
-export async function discoverConfig(options: DiscoverOptions = {}): Promise<DiscoveredConfig | null> {
+export async function discoverConfig(options: DiscoverOptions = {}): Promise<CredentialDiscoveryResult | null> {
   const cwd = options.cwd ?? process.cwd();
   const env = options.env ?? process.env;
   const envBaseUrl = env.GITEA_BASE_URL;
@@ -206,28 +289,60 @@ export async function discoverConfig(options: DiscoverOptions = {}): Promise<Dis
     host = selected?.host;
   }
 
-  let token: string | undefined;
+  const candidates: CandidateCredential[] = [];
+
+  // Source 1: .git/config [gitea "<baseUrl>"] token / bare [gitea] token.
   if (host) {
-    token = readTokenFromGitConfig(gitConfigContent, baseUrl);
-    if (!token) {
-      const paths = options.credentialsPaths ?? defaultCredentialsPaths();
-      for (const path of paths) {
-        const cred = await readOptionalFile(path);
-        if (cred) {
-          token = parseGitCredentials(cred, host);
-          if (token) break;
-        }
-      }
+    const configToken = readTokenFromGitConfig(gitConfigContent, baseUrl);
+    if (configToken) {
+      candidates.push({
+        source: "gitea-config",
+        secret: configToken,
+        schemes: ["token"],
+        status: "pending",
+        nextSchemeIndex: 0,
+      });
     }
   }
-  if (!token) token = env.GITEA_TOKEN;
+
+  // Source 2: GITEA_TOKEN env (simple-token semantics — no scheme probing).
+  const envToken = env.GITEA_TOKEN;
+  if (envToken) {
+    candidates.push({
+      source: "env",
+      secret: envToken,
+      schemes: ["token"],
+      status: "pending",
+      nextSchemeIndex: 0,
+    });
+  }
+
+  // Source 3..N: credential-store entries, host-matched and path-narrowed.
+  if (host) {
+    const paths = options.credentialsPaths ?? defaultCredentialsPaths();
+    const repoPath = selected ? `${selected.owner}/${selected.repo}` : "";
+    const scored: { entry: ParsedCredentialEntry; score: number; order: number }[] = [];
+    let order = 0;
+    for (const path of paths) {
+      const cred = await readOptionalFile(path);
+      if (!cred) continue;
+      for (const entry of parseGitCredentials(cred, host)) {
+        scored.push({ entry, score: scoreEntryPath(entry.path, repoPath), order: order++ });
+      }
+    }
+    // Sort by score desc; stable within same score (preserve file/discovery order).
+    scored.sort((a, b) => b.score - a.score || a.order - b.order);
+    for (const { entry } of scored) {
+      const candidate = candidateFromEntry(entry);
+      if (candidate) candidates.push(candidate);
+    }
+  }
 
   return {
     baseUrl,
-    token,
     defaultOwner: env.GITEA_DEFAULT_OWNER ?? selected?.owner,
     defaultRepo: env.GITEA_DEFAULT_REPO ?? selected?.repo,
     remote: selected?.remote,
-    source: envBaseUrl ? "env" : "git",
+    candidates,
   };
 }

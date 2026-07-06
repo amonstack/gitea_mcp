@@ -47,44 +47,46 @@ describe("cli entry point", () => {
     expect(runServer).not.toHaveBeenCalled();
   });
 
-  it("starts the server with the discovered baseUrl/token/owner/repo", async () => {
+  it("starts the server with the discovered baseUrl/candidates/owner/repo", async () => {
     vi.mocked(discoverConfig).mockResolvedValue({
       baseUrl: "https://gitea.example",
-      token: "tok",
+      candidates: [{ source: "env", secret: "tok", schemes: ["token"], status: "pending", nextSchemeIndex: 0 }],
       defaultOwner: "owner",
       defaultRepo: "repo",
       remote: "origin",
-      source: "git",
     });
     vi.mocked(runServer).mockResolvedValue(undefined);
     await import("../cli.js");
     await vi.waitFor(() => {
-      expect(runServer).toHaveBeenCalledWith("https://gitea.example", "tok", "owner", "repo");
+      expect(runServer).toHaveBeenCalledWith(
+        "https://gitea.example",
+        [{ source: "env", secret: "tok", schemes: ["token"], status: "pending", nextSchemeIndex: 0 }],
+        "owner",
+        "repo",
+      );
     });
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
-  it("starts the server with an undefined token when discovery yields none", async () => {
+  it("starts the server with empty candidates when discovery yields none", async () => {
     vi.mocked(discoverConfig).mockResolvedValue({
       baseUrl: "https://gitea.example",
-      token: undefined,
+      candidates: [],
       defaultOwner: "owner",
       defaultRepo: "repo",
       remote: "origin",
-      source: "git",
     });
     vi.mocked(runServer).mockResolvedValue(undefined);
     await import("../cli.js");
     await vi.waitFor(() => {
-      expect(runServer).toHaveBeenCalledWith("https://gitea.example", undefined, "owner", "repo");
+      expect(runServer).toHaveBeenCalledWith("https://gitea.example", [], "owner", "repo");
     });
   });
 
   it("logs a fatal error and exits 1 when runServer rejects", async () => {
     vi.mocked(discoverConfig).mockResolvedValue({
       baseUrl: "https://gitea.example",
-      token: "tok",
-      source: "git",
+      candidates: [],
     });
     exitSpy.mockImplementation((() => undefined) as never);
     vi.mocked(runServer).mockRejectedValue(new Error("boom"));

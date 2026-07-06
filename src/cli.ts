@@ -14,10 +14,14 @@ if (argv[0] === "init") {
     process.exit(1);
   });
 } else {
-  // Resolve baseUrl/owner/repo/token from env first, then the local git context
-  // (`.git/config` remotes + credential store). When neither env nor any git
-  // remote provides a baseUrl, the server is intentionally skipped: a single
-  // global install should stay dormant outside of git projects.
+  // Resolve baseUrl/owner/repo/credentials from env first, then the local git
+  // context (`.git/config` remotes + credential store). Discovery collects ALL
+  // credential candidates (config token, env token, credential-store entries)
+  // rather than picking one, so the client can fall back across them when one
+  // scheme is rejected (e.g. an account password that is not a PAT). When
+  // neither env nor any git remote provides a baseUrl, the server is
+  // intentionally skipped: a single global install should stay dormant outside
+  // of git projects.
   const discovered = await discoverConfig().catch((err: unknown) => {
     console.error("Fatal error:", err);
     process.exit(1);
@@ -32,7 +36,7 @@ if (argv[0] === "init") {
 
   runServer(
     discovered.baseUrl,
-    discovered.token,
+    discovered.candidates,
     discovered.defaultOwner,
     discovered.defaultRepo,
   ).catch((err: unknown) => {

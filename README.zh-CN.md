@@ -56,7 +56,7 @@ node dist/cli.js
 | 变量 | 必填 | 说明 |
 |------|:----:|------|
 | `GITEA_BASE_URL` | 否 | Gitea 实例地址（如 `https://gitea.example.com`）。未设置时从项目 git 远程地址自动推导。 |
-| `GITEA_TOKEN` | 否 | Gitea API 访问令牌。依次从 `.git/config`、git 凭据存储、本变量解析（见[令牌发现](#令牌发现)）。 |
+| `GITEA_TOKEN` | 否 | Gitea API 访问令牌。是多个认证候选之一；排在 `.git/config [gitea]` 令牌之后、git 凭据存储之前（见[令牌发现](#令牌发现)）。 |
 | `GITEA_DEFAULT_OWNER` | 否 | 默认仓库所有者，免去每次传入 `owner` 参数 |
 | `GITEA_DEFAULT_REPO` | 否 | 默认仓库名称，免去每次传入 `repo` 参数 |
 
@@ -76,20 +76,40 @@ node dist/cli.js
 
 ### 令牌发现
 
-令牌按以下顺序解析（先匹配者胜出）：
+`gitea-mcp` 从三个来源收集认证**候选**，按以下优先级排序：
 
-1. `.git/config` 中的 `[gitea "<baseUrl>"]` 段：
+1. `.git/config` 中的 `[gitea "<baseUrl>"]` 段（不带地址的 `[gitea]` 段作为全局兜底）：
    ```ini
    [gitea "https://gitea.example.com"]
        token = <your-token>
    ```
-   不带地址的 `[gitea]` 段中的 `token = ...` 作为全局兜底。
-2. git 凭据存储（`~/.git-credentials`，或 `$XDG_CONFIG_HOME/git/credentials`）——host 匹配实例
-   的那一行，如 `https://oauth2:<token>@gitea.example.com`。
-3. `GITEA_TOKEN` 环境变量。
+   始终以 `Authorization: token <token>` 发送。
+2. `GITEA_TOKEN` 环境变量 —— 同样以 `Authorization: token` 发送。
+3. git 凭据存储（`~/.git-credentials`，或 `$XDG_CONFIG_HOME/git/credentials`）—— host 匹配实例
+   的每一行，如 `https://alice:s3cret@gitea.example.com`。多行同时匹配时，path 与 `owner/repo`
+   最贴近的那一行优先尝试。
 
-若都未解析到，服务器仍会以匿名方式启动。公开仓库可读；私有仓库和写操作返回 `401`——此时使用
-`gitea-configure` 技能引导配置，或设置 `GITEA_TOKEN`。
+凭据存储条目的 `password` 字段可能是真正的 PAT、账户登录密码，或 OAuth token —— git 存的是
+用户在密码提示里输入的任何内容，服务端无法静态区分。因此每个凭据存储条目会以**两种认证方案**
+依次尝试：
+
+- `Authorization: Basic <base64(user:pass)>` —— 账户密码和 PAT 都能通过（Gitea 会校验用户名与
+  密钥属主一致）。
+- `Authorization: token <secret>` —— 仅对真正的 PAT 有效。
+
+尝试顺序由用户名启发式决定：约定用户名（`oauth2`、`x-oauth-basic`、空）先试 `token`；真实用户名
+（如 `alice`）先试 `basic`。
+
+**容错。** 遇到 `401`/`403`，服务端会切换到下一个方案/候选并重试同一请求；一旦某组凭据成功，
+它会被锁定到本会话结束（不再重复探测）。非认证类错误（`404`、`500`、网络错误）立即向上抛出，
+**不会**触发重试。
+
+**诊断。** `gitea_status` 工具（见[仓库辅助](#仓库辅助-repository-helpers)）返回当前状态的脱敏
+视图 —— 哪个候选处于 active、哪些已耗尽、最近一次的状态码 —— 永不暴露密钥本身。排查 `401` 时
+用它代替盲猜。
+
+若所有来源都未解析到凭据，服务器仍会以匿名方式启动。公开仓库可读；私有仓库和写操作返回
+`401` —— 此时使用 `gitea-configure` 技能引导配置，或设置 `GITEA_TOKEN`。
 
 设置 `GITEA_DEFAULT_OWNER` 和 `GITEA_DEFAULT_REPO` 后，调用工具时可以省略
 `owner` 和 `repo` 参数。也可以使用 `resolve_repo` 工具自动从本地 git 仓库
@@ -227,6 +247,7 @@ gitea-mcp
 |------|------|
 | `list_my_repos` | 列出当前用户可访问的仓库 |
 | `resolve_repo` | 从项目 git 远程地址检测 `baseUrl`、`owner`、`repo`（优先 `upstream`，回退 `origin`） |
+| `gitea_status` | 查看认证处理状态 —— active 候选、已耗尽候选、最近一次错误（脱敏；永不暴露密钥） |
 
 ## AI 引导与技能
 

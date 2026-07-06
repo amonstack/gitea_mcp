@@ -1,7 +1,44 @@
+import {
+  type CandidateCredential,
+  type CandidateSummary,
+  buildAuthHeader,
+  pickNextAttempt,
+  markAttemptFailed,
+  markAttemptSucceeded,
+  findActiveCandidateIndex,
+  summarizeCandidates,
+} from "./credentials.js";
+
 export interface GiteaConfig {
   baseUrl: string;
-  /** Omitted when no token source resolves; requests are then anonymous and a Skill guides the user. */
+  /**
+   * Legacy single-token mode. When `candidates` is omitted, this is wrapped
+   * as a one-element candidate list with the `token` scheme (preserving the
+   * pre-multi-credential behavior exactly).
+   */
   token?: string;
+  /**
+   * Credential candidates in priority order. When provided, enables the
+   * fault-tolerant auth state machine: each candidate × scheme is tried in
+   * order until one succeeds, with 401/403 advancing to the next attempt.
+   */
+  candidates?: CandidateCredential[];
+}
+
+/**
+ * HTTP error from the Gitea API. Carries `status` as a structured field so
+ * callers (the retry loop, tests) can branch on it without parsing the
+ * message string (AGENTS.md §2.3 forbids substring-based control flow).
+ */
+export class GiteaApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly statusText: string,
+    public readonly body: string,
+  ) {
+    super(`Gitea API error (${status}): ${body || statusText}`);
+    this.name = "GiteaApiError";
+  }
 }
 
 export interface Issue {
@@ -155,21 +192,59 @@ export interface UpdateMilestoneParams {
 
 export class GiteaClient {
   private baseUrl: string;
-  private token?: string;
+  private candidates: CandidateCredential[];
 
   constructor(config: GiteaConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
-    this.token = config.token;
+    if (config.candidates && config.candidates.length > 0) {
+      // Defensive copy so external mutation cannot desync the state machine.
+      this.candidates = config.candidates.map((c) => ({ ...c }));
+    } else if (config.token) {
+      this.candidates = [
+        {
+          source: "env",
+          secret: config.token,
+          schemes: ["token"],
+          status: "pending",
+          nextSchemeIndex: 0,
+        },
+      ];
+    } else {
+      this.candidates = [];
+    }
   }
 
-  private async request<T>(
+  /**
+   * Snapshot of the credential state machine — for the `gitea_status` tool.
+   * Secrets are never included; only `secretPresent: boolean` and a masked
+   * `username`. See `summarizeCandidates` in `credentials.ts`.
+   */
+  getCredentialStatus(): {
+    candidates: CandidateSummary[];
+    activeIndex: number | null;
+    totalCandidates: number;
+  } {
+    return {
+      candidates: summarizeCandidates(this.candidates),
+      activeIndex: findActiveCandidateIndex(this.candidates),
+      totalCandidates: this.candidates.length,
+    };
+  }
+
+  /**
+   * Single HTTP call. Throws `GiteaApiError` on non-2xx so the retry loop can
+   * branch on `status` (never on the message string). The `authHeader` is
+   * pre-built by the caller from the active candidate + scheme.
+   */
+  private async doRequest<T>(
     method: string,
     path: string,
-    body?: unknown,
+    body: unknown,
+    authHeader: string | null,
   ): Promise<T> {
     const url = `${this.baseUrl}/api/v1${path}`;
     const headers: Record<string, string> = { Accept: "application/json" };
-    if (this.token) headers["Authorization"] = `token ${this.token}`;
+    if (authHeader) headers["Authorization"] = authHeader;
 
     const init: RequestInit = { method, headers };
     if (body !== undefined) {
@@ -181,9 +256,7 @@ export class GiteaClient {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
-      throw new Error(
-        `Gitea API error (${response.status}): ${errorText || response.statusText}`,
-      );
+      throw new GiteaApiError(response.status, response.statusText, errorText);
     }
 
     if (response.status === 204) {
@@ -191,6 +264,67 @@ export class GiteaClient {
     }
 
     return response.json() as Promise<T>;
+  }
+
+  /**
+   * Auth-aware request entry point. Three modes:
+   *
+   * 1. Active candidate exists (a prior attempt succeeded): reuse its locked
+   *    scheme directly, no iteration.
+   * 2. No candidates at all: anonymous request (no Authorization header).
+   * 3. Otherwise: iterate (candidate, scheme) pairs in priority order, trying
+   *    each until one succeeds. On 401/403 the current attempt is marked
+   *    failed and the next is tried; non-auth errors propagate immediately
+   *    (we do NOT mask 5xx / network errors as auth failures). When every
+   *    candidate × scheme is exhausted, the most recent `GiteaApiError` is
+   *    re-thrown so the caller sees the underlying status/body; the
+   *    `gitea_status` tool surfaces the full attempt history.
+   */
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    const activeIdx = findActiveCandidateIndex(this.candidates);
+    if (activeIdx !== null) {
+      const active = this.candidates[activeIdx];
+      const scheme = active.activeScheme ?? active.schemes[0];
+      return this.doRequest<T>(method, path, body, buildAuthHeader(active, scheme));
+    }
+
+    if (this.candidates.length === 0) {
+      return this.doRequest<T>(method, path, body, null);
+    }
+
+    let lastError: GiteaApiError | null = null;
+    while (true) {
+      const attempt = pickNextAttempt(this.candidates);
+      if (!attempt) {
+        // Exhausted. Re-throw the underlying API error so the status/body
+        // format is preserved. The gitea_status tool reveals the full
+        // candidate × scheme attempt history.
+        if (lastError) throw lastError;
+        throw new GiteaApiError(0, "", "all credential candidates exhausted");
+      }
+      const candidate = this.candidates[attempt.candidateIndex];
+      try {
+        const result = await this.doRequest<T>(
+          method,
+          path,
+          body,
+          buildAuthHeader(candidate, attempt.scheme),
+        );
+        markAttemptSucceeded(this.candidates, attempt.candidateIndex, attempt.scheme);
+        return result;
+      } catch (err) {
+        if (err instanceof GiteaApiError && (err.status === 401 || err.status === 403)) {
+          markAttemptFailed(this.candidates, attempt.candidateIndex, `${err.status}`);
+          lastError = err;
+          continue;
+        }
+        throw err;
+      }
+    }
   }
 
   async listIssues(

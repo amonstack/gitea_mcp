@@ -28,8 +28,10 @@ import {
   DeleteMilestoneSchema,
   ResolveRepoSchema,
   ListMyReposSchema,
+  GiteaStatusSchema,
 } from "./tools.js";
 import { parseRemotes, selectRemote } from "./git-config.js";
+import type { CandidateCredential } from "./credentials.js";
 
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -41,11 +43,13 @@ const pkg = require("../package.json") as { version: string };
 
 export async function createServer(
   baseUrl: string,
-  token?: string,
+  candidates?: CandidateCredential[],
   defaultOwner?: string,
   defaultRepo?: string,
 ) {
-  const client = new GiteaClient({ baseUrl, token });
+  const client = Array.isArray(candidates)
+    ? new GiteaClient({ baseUrl, candidates })
+    : new GiteaClient({ baseUrl, token: candidates });
 
   const moduleDir = dirname(fileURLToPath(import.meta.url));
   let instructions: string | undefined;
@@ -513,6 +517,21 @@ export async function createServer(
     },
   );
 
+  server.registerTool(
+    "gitea_status",
+    {
+      description:
+        "Report the resolved credential state: every discovered credential candidate, its source (gitea-config / env / credential-store), the auth schemes that will be tried, and per-scheme outcome (pending / active / exhausted with redacted last error). Secrets are NEVER returned — only a `secretPresent` boolean and a masked username (`firstChar***`). Use this when a tool returns 401/403 to see which schemes were rejected and which candidate (if any) is currently active. Takes no input.",
+      inputSchema: GiteaStatusSchema.shape,
+    },
+    async () => {
+      const status = client.getCredentialStatus();
+      return {
+        content: [{ type: "text", text: JSON.stringify(status, null, 2) }],
+      };
+    },
+  );
+
   // ── Resources (on-demand reference docs for clients that surface them) ──
 
   const registerDocResource = (
@@ -697,11 +716,11 @@ export async function createServer(
 
 export async function runServer(
   baseUrl: string,
-  token?: string,
+  candidates?: CandidateCredential[],
   defaultOwner?: string,
   defaultRepo?: string,
 ) {
-  const server = await createServer(baseUrl, token, defaultOwner, defaultRepo);
+  const server = await createServer(baseUrl, candidates, defaultOwner, defaultRepo);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
