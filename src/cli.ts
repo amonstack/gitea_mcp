@@ -1,29 +1,41 @@
 #!/usr/bin/env node
 import { runServer } from "./server.js";
+import { discoverConfig } from "./git-config.js";
 
 const argv = process.argv.slice(2);
 
 if (argv[0] === "init") {
   // `gitea-mcp init [--tool <name>]` installs the bundled skills into a target
   // AI tool's skills directory. It needs no Gitea credentials, so it is
-  // dispatched before the env-var guard below.
+  // dispatched before the config-discovery logic below.
   const { runInitCommand } = await import("./skills.js");
   runInitCommand(argv.slice(1)).catch((err: unknown) => {
     console.error("Fatal error:", err);
     process.exit(1);
   });
 } else {
-  const baseUrl = process.env.GITEA_BASE_URL;
-  const token = process.env.GITEA_TOKEN;
-  const defaultOwner = process.env.GITEA_DEFAULT_OWNER;
-  const defaultRepo = process.env.GITEA_DEFAULT_REPO;
-
-  if (!baseUrl || !token) {
-    console.error("GITEA_BASE_URL and GITEA_TOKEN environment variables are required");
+  // Resolve baseUrl/owner/repo/token from env first, then the local git context
+  // (`.git/config` remotes + credential store). When neither env nor any git
+  // remote provides a baseUrl, the server is intentionally skipped: a single
+  // global install should stay dormant outside of git projects.
+  const discovered = await discoverConfig().catch((err: unknown) => {
+    console.error("Fatal error:", err);
     process.exit(1);
+  });
+
+  if (!discovered) {
+    console.error(
+      `gitea-mcp: no git remote found in ${process.cwd()} and GITEA_BASE_URL is not set; skipping server start.`,
+    );
+    process.exit(0);
   }
 
-  runServer(baseUrl, token, defaultOwner, defaultRepo).catch((err: unknown) => {
+  runServer(
+    discovered.baseUrl,
+    discovered.token,
+    discovered.defaultOwner,
+    discovered.defaultRepo,
+  ).catch((err: unknown) => {
     console.error("Fatal error:", err);
     process.exit(1);
   });

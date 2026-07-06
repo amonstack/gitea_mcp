@@ -52,12 +52,49 @@ node dist/cli.js
 
 ## Configuration
 
+All variables are optional — `gitea-mcp` auto-discovers the Gitea instance, repository,
+and token from the project's local git config so a single global install can serve many
+projects. Set them only to override the discovery.
+
 | Variable | Required | Description |
 |----------|:--------:|-------------|
-| `GITEA_BASE_URL` | Yes | Gitea instance URL (e.g. `https://gitea.example.com`) |
-| `GITEA_TOKEN` | Yes | Gitea API access token |
+| `GITEA_BASE_URL` | No | Gitea instance URL (e.g. `https://gitea.example.com`). Auto-detected from the project's git remote when omitted. |
+| `GITEA_TOKEN` | No | Gitea API access token. Resolved from `.git/config`, the git credential store, then this variable (see [Token discovery](#token-discovery)). |
 | `GITEA_DEFAULT_OWNER` | No | Default repository owner — skip passing `owner` on every call |
 | `GITEA_DEFAULT_REPO` | No | Default repository name — skip passing `repo` on every call |
+
+### How auto-discovery works
+
+On start, `gitea-mcp` reads `<cwd>/.git/config` and derives:
+
+- **Instance URL** — from the selected remote's host. SSH remotes (`git@host:owner/repo`)
+  resolve to `https://host`. Override with `GITEA_BASE_URL`.
+- **owner / repo** — from the selected remote's URL. Override with `GITEA_DEFAULT_OWNER` /
+  `GITEA_DEFAULT_REPO`, or detect ad hoc with the `resolve_repo` tool.
+- **Remote selection** — the `upstream` remote is preferred, falling back to `origin`, then
+  any other remote. Both are reported by `resolve_repo` when they differ.
+
+If the current directory has no git remote and `GITEA_BASE_URL` is not set, the server does
+**not** start — it prints a skip reason and exits 0. Run it from inside a cloned Gitea
+repository, or set `GITEA_BASE_URL` / `GITEA_TOKEN` explicitly.
+
+### Token discovery
+
+The token is resolved in this order (first match wins):
+
+1. A `[gitea "<baseUrl>"]` section in `.git/config`:
+   ```ini
+   [gitea "https://gitea.example.com"]
+       token = <your-token>
+   ```
+   A bare `[gitea]` section with `token = ...` is a host-wide fallback.
+2. The git credential store (`~/.git-credentials`, or `$XDG_CONFIG_HOME/git/credentials`) —
+   a line whose host matches the instance, e.g. `https://oauth2:<token>@gitea.example.com`.
+3. The `GITEA_TOKEN` environment variable.
+
+If none resolves, the server still starts without a token (anonymous). Public repositories
+may be read; private repos and write operations return `401` — use the `gitea-configure`
+skill to guide setup, or set `GITEA_TOKEN`.
 
 When `GITEA_DEFAULT_OWNER` and `GITEA_DEFAULT_REPO` are set, you can omit the
 `owner` and `repo` parameters in tool calls. The `resolve_repo` tool can also
@@ -131,7 +168,14 @@ directory; use `--dir` for an exact location. Then restart your tool. See
 ### Other MCP Clients
 
 Any client that supports stdio-based MCP servers can use `gitea-mcp`. After
-installation, set the required environment variables and run:
+installation, run it from inside a cloned Gitea repository (config is auto-discovered):
+
+```bash
+cd /path/to/your/gitea-repo
+gitea-mcp
+```
+
+Or set the variables explicitly if you prefer:
 
 ```bash
 export GITEA_BASE_URL="https://gitea.example.com"
@@ -189,7 +233,7 @@ gitea-mcp
 | Tool | Description |
 |------|-------------|
 | `list_my_repos` | List repositories accessible to the authenticated user |
-| `resolve_repo` | Auto-detect `owner` and `repo` from a local git remote URL |
+| `resolve_repo` | Detect `baseUrl`, `owner`, and `repo` from the project's git remotes (`upstream` preferred, then `origin`) |
 
 ## AI Guidance & Skills
 
@@ -222,6 +266,7 @@ say, delete instructions while creating). Install them with the
 | `gitea-summarize-issue` | reading and summarizing an issue's discussion |
 | `gitea-plan-milestones` | creating / editing / closing milestones |
 | `gitea-resolve-repo` | resolving owner/repo or listing repositories |
+| `gitea-configure` | fixing the connection — instance URL, token, or 401/403 errors |
 
 Each skill is a short, AI-facing action flow (purpose, when to use, when not to,
 rules, and what to check first). The create, comment, and milestone skills also

@@ -25,8 +25,8 @@ requests against the [Gitea REST API (`/api/v1`)](https://docs.gitea.com/api/1.2
 │   opencode…)  │              │   └─ GiteaClient.request<T>  │               │   milestones, …)     │
 └───────────────┘              └──────────────────────────────┘               └──────────────────────┘
         ▲
-        │ env: GITEA_BASE_URL, GITEA_TOKEN, GITEA_DEFAULT_OWNER, GITEA_DEFAULT_REPO
-   cli.ts (process entry)
+        │ env (all optional overrides): GITEA_BASE_URL, GITEA_TOKEN, GITEA_DEFAULT_OWNER, GITEA_DEFAULT_REPO
+   cli.ts (process entry) ──► git-config.ts (discoverConfig: .git/config + credential store + env)
 ```
 
 Per-call flow:
@@ -65,8 +65,9 @@ responsibility:
 ```
 src/
 ├── index.ts           # Package entry (main); re-exports createServer/runServer for programmatic use
-├── cli.ts            # Process entry point (env → runServer, init CLI dispatch)
-├── server.ts         # McpServer, tool/prompt/resource registration, resolve(), parseGitRemoteUrl
+├── cli.ts            # Process entry point (discoverConfig → runServer, init CLI dispatch)
+├── git-config.ts     # Auto-discovery: parse remotes, resolve baseUrl/owner/repo/token from git + env
+├── server.ts         # McpServer, tool/prompt/resource registration, resolve()
 ├── tools.ts          # One Zod schema per tool input
 ├── gitea-client.ts   # GiteaClient REST wrapper (request<T> + HTTP methods)
 ├── skills.ts         # skill install logic + tool registry (gitea-mcp init --tool <name>)
@@ -84,16 +85,18 @@ scripts/
 | File | Responsibility (invariant) |
 |------|----------------------------|
 | `src/index.ts` | The package `main` entry. Re-exports `createServer` and `runServer` from `server.ts` so `import "@amonstack/gitea-mcp"` works for programmatic use. Defines nothing of its own. |
-| `src/cli.ts` | Process entry point for the `gitea-mcp` bin. Reads env vars (`GITEA_BASE_URL`, `GITEA_TOKEN`, `GITEA_DEFAULT_OWNER`, `GITEA_DEFAULT_REPO`), validates the required ones, and calls `runServer`. Dispatches the `gitea-mcp init ...` subcommand (no credentials required) to `skills.ts`. Contains no tool or HTTP logic. |
-| `src/server.ts` | Creates the `McpServer`, registers every tool (name + Zod schema + handler), prompt, and resource, owns the `resolve()` owner/repo fallback and `parseGitRemoteUrl`, and loads the handshake `instructions` from `assets/instructions.md`. Exports `createServer` and `runServer`. |
+| `src/cli.ts` | Process entry point for the `gitea-mcp` bin. Calls `git-config.ts`'s `discoverConfig()` to resolve the Gitea instance, token, and default owner/repo from git + env. With no git remote and no `GITEA_BASE_URL`, it prints a one-line reason and exits `0` (server intentionally skipped, not broken). Dispatches the `gitea-mcp init ...` subcommand (no credentials required) to `skills.ts`. Contains no tool or HTTP logic. |
+| `src/git-config.ts` | Auto-discovery leaf module. Parses `.git/config` remotes (`parseGitRemoteUrl`, `readGitRemotes`, `selectRemote`), resolves the instance URL (SSH remote → `https://<host>`), and walks the token fallback chain: `[gitea "<baseUrl>"] token` in `.git/config` → bare `[gitea] token` → git credential store (`~/.git-credentials` / XDG) → `GITEA_TOKEN`. Exports `discoverConfig({cwd,env,credentialsPaths})` returning `{baseUrl,token?,defaultOwner?,defaultRepo?,remote?,source}` or `null` when no instance can be found. No MCP/HTTP logic; reads files but swallows only `ENOENT` (rethrows other errors). |
+| `src/server.ts` | Creates the `McpServer`, registers every tool (name + Zod schema + handler), prompt, and resource, owns the `resolve()` owner/repo fallback, and loads the handshake `instructions` from `assets/instructions.md`. The `resolve_repo` tool delegates remote parsing to `git-config.ts` (`parseRemotes` + `selectRemote`). Exports `createServer` and `runServer`. |
 | `src/tools.ts` | Exports one Zod schema per tool input. The set of schemas stays 1:1 with the tools registered in `server.ts` and the tool tables in `README.md`. |
 | `src/gitea-client.ts` | `GiteaClient` — the REST client wrapping Gitea `/api/v1`. Owns the `request<T>` helper (auth header, JSON, `204` handling) and all HTTP methods. Contains no MCP/stdio logic. |
 | `src/skills.ts` | The `gitea-mcp init --tool <name>` implementation: carries the registry of supported target tools and, for the chosen tool, copies every bundled skill (each subdirectory of `dist/assets/skills/` containing a `SKILL.md`) into that tool's skills directory, one folder per skill. No MCP/HTTP logic; no Gitea credentials required. |
 | `src/assets/**` | Markdown guidance content (instructions, resources, the action skills). Pure data, read at runtime; copied into `dist/assets/` by `scripts/copy-assets.mjs` so it ships with the published package. |
 
-`cli.ts` is a thin shell; `server.ts` is the composition root; `tools.ts` is
-pure schema declarations; `gitea-client.ts` is pure HTTP. Mixing concerns
-across these files is a deviation from the architecture.
+`cli.ts` is a thin shell; `git-config.ts` is a pure discovery leaf (file reads
+only); `server.ts` is the composition root; `tools.ts` is pure schema
+declarations; `gitea-client.ts` is pure HTTP. Mixing concerns across these
+files is a deviation from the architecture.
 
 ## 4. Module Dependency Graph
 
@@ -102,10 +105,14 @@ list):
 
 ```
 cli.ts
-  ├─► server.ts        (runServer — default MCP mode)
-  └─► skills.ts        (runInitCommand — only the `gitea-mcp init` subcommand)
+  ├─► git-config.ts      (discoverConfig — resolves baseUrl/token/owner/repo before runServer)
+  ├─► server.ts          (runServer — default MCP mode)
+  └─► skills.ts          (runInitCommand — only the `gitea-mcp init` subcommand)
+git-config.ts
+  └─► node:fs/promises, node:os, node:path  (reads .git/config + credential store; env)
 server.ts
   ├─► tools.ts          (Zod schemas)
+  ├─► git-config.ts     (parseRemotes, selectRemote — used by the resolve_repo tool)
   ├─► gitea-client.ts   (GiteaClient)
   ├─► @modelcontextprotocol/sdk  (McpServer, StdioServerTransport)
   └─► assets/*.md       (readFile at runtime: instructions + resources)
@@ -115,13 +122,15 @@ skills.ts
 
 Rules implied by the graph:
 
-- `gitea-client.ts` and `tools.ts` are leaves — they import none of the other
-  project files, only external packages.
-- `server.ts` is the only file that imports both `tools.ts` and
-  `gitea-client.ts`; it is the composition root that wires schemas to handlers
-  to client methods. It also reads guidance markdown from `assets/`.
-- `cli.ts` depends on `server.ts`'s `runServer` and (lazily, only for the
-  `init` subcommand) on `skills.ts`. No file imports `cli.ts`.
+- `gitea-client.ts`, `tools.ts`, and `git-config.ts` are leaves — they import
+  none of the other project files, only external packages / Node built-ins.
+- `server.ts` is the composition root: the only file that imports both
+  `tools.ts` and `gitea-client.ts`, wiring schemas to handlers to client
+  methods. It also reads guidance markdown from `assets/` and reuses
+  `git-config.ts`'s remote parsers for `resolve_repo`.
+- `cli.ts` depends on `server.ts`'s `runServer`, `git-config.ts`'s
+  `discoverConfig`, and (lazily, only for the `init` subcommand) on
+  `skills.ts`. No file imports `cli.ts`.
 - `skills.ts` is a leaf that only reads the bundled skills tree; it touches no
   MCP/HTTP logic and needs no Gitea credentials.
 - There are no cycles and no hidden lateral imports (e.g. `gitea-client.ts`
@@ -153,16 +162,28 @@ server.registerTool(
 
 ### 5.2 Owner / Repo Resolution
 
-`resolve()` in `server.ts` applies a fallback chain so callers can omit
-`owner` / `repo` on every call:
+At server start, `cli.ts` runs `discoverConfig()` (`git-config.ts`) which reads
+`<cwd>/.git/config`, parses every `[remote "<name>"]` URL, and selects one with
+the priority **`upstream` → `origin` → first remaining**. The selected remote
+contributes the default `owner` / `repo`, and its host becomes the Gitea
+instance base URL (an SSH remote like `git@host:owner/repo.git` is mapped to
+`https://<host>`). `GITEA_BASE_URL`, `GITEA_DEFAULT_OWNER`, and
+`GITEA_DEFAULT_REPO` are **optional overrides** that win over the git-derived
+values. With no git remote and no `GITEA_BASE_URL`, `cli.ts` prints a one-line
+reason and exits `0` (the server is intentionally skipped, not crashed).
+
+`resolve()` in `server.ts` then applies a per-call fallback so individual tool
+invocations can still omit `owner` / `repo`:
 
 ```
-explicit argument  ─►  GITEA_DEFAULT_OWNER / GITEA_DEFAULT_REPO  ─►  throw
+explicit argument  ─►  (git-discovered or env) default owner/repo  ─►  throw
 ```
 
-The `resolve_repo` tool offers a fourth source: it parses the `origin` remote
-URL from a local git working copy (`parseGitRemoteUrl` handles both SSH and
-HTTPS forms) and returns `{ owner, repo }` for the caller to supply.
+The `resolve_repo` tool offers an explicit re-detection path: it parses ALL
+remotes (via `git-config.ts`'s `parseRemotes` + `selectRemote`) and returns
+`{ baseUrl, owner, repo, remote, remote_url, remotes: { <name>: { baseUrl,
+owner, repo, url } } }` so the caller can see both `upstream` and `origin` at
+once. It throws `No parseable git remotes found in <path>` when none parse.
 
 ### 5.3 HTTP via `request<T>`
 
@@ -216,14 +237,20 @@ with the actual tool behavior.
 
 | Variable | Required | Consumer | Purpose |
 |----------|:--------:|----------|---------|
-| `GITEA_BASE_URL` | Yes | `cli.ts` → `GiteaClient` | Gitea instance origin (e.g. `https://gitea.example.com`) |
-| `GITEA_TOKEN` | Yes | `cli.ts` → `GiteaClient` | API access token, sent only as the `Authorization: token` header |
-| `GITEA_DEFAULT_OWNER` | No | `cli.ts` → `server.resolve` | Default repository owner so `owner` can be omitted per call |
-| `GITEA_DEFAULT_REPO` | No | `cli.ts` → `server.resolve` | Default repository name so `repo` can be omitted per call |
+| `GITEA_BASE_URL` | No | `cli.ts` → `GiteaClient` | Gitea instance origin (e.g. `https://gitea.example.com`). When unset, auto-detected from the selected git remote's host. |
+| `GITEA_TOKEN` | No | `cli.ts` → `GiteaClient` | API access token, sent only as the `Authorization: token` header. When unset, resolved via the token discovery chain (`.git/config` → credential store → env). If still missing, the server starts anonymously and write calls fail `401/403` — the `gitea-configure` skill guides the user to add one. |
+| `GITEA_DEFAULT_OWNER` | No | `cli.ts` → `server.resolve` | Default repository owner so `owner` can be omitted per call; defaults to the selected remote's owner. |
+| `GITEA_DEFAULT_REPO` | No | `cli.ts` → `server.resolve` | Default repository name so `repo` can be omitted per call; defaults to the selected remote's repo. |
 | `NPM_TOKEN` | No (publish only) | `make publish` | npm publish token; never read at runtime |
 
-`cli.ts` validates that `GITEA_BASE_URL` and `GITEA_TOKEN` are present and
-exits `1` with a clear message if either is missing.
+All four `GITEA_*` variables are optional overrides; none is validated as
+required. `cli.ts` calls `discoverConfig()` (`git-config.ts`) to resolve the
+instance URL, token, and default owner/repo from `<cwd>/.git/config` remotes
+plus the git credential store before falling back to the env vars. When no
+instance can be resolved (no git remote and no `GITEA_BASE_URL`), `cli.ts`
+prints a one-line reason to stderr and exits `0` — the server is intentionally
+skipped, not crashed, so a single global install degrades gracefully in
+non-Gitea directories.
 
 ## 7. Build & Packaging
 

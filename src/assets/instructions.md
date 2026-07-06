@@ -4,18 +4,29 @@ You manage Gitea issues, comments, labels, and milestones through this MCP serve
 Every tool returns Gitea's JSON verbatim as text. Follow these rules to use them
 correctly.
 
+## Config is auto-discovered from git (env vars optional)
+
+On start the server reads `<cwd>/.git/config` and derives `baseUrl`, `owner`, `repo`,
+and `token` so one global install can serve many projects. The `GITEA_BASE_URL` /
+`GITEA_TOKEN` / `GITEA_DEFAULT_OWNER` / `GITEA_DEFAULT_REPO` env vars are OPTIONAL
+overrides; when set they take precedence over git discovery. The remote is chosen
+`upstream` first, then `origin`. If the cwd has no git remote and `GITEA_BASE_URL` is
+unset, the server does not start (it prints a skip reason and exits 0). If you hit a
+401/403 or the connection looks unset, use the **gitea-configure** skill.
+
 ## Resolve owner/repo FIRST (most common failure)
 
 Most tools target one repository and need both `owner` and `repo`. They resolve in
 this order:
 
 1. The `owner` / `repo` arguments you pass to the call.
-2. `GITEA_DEFAULT_OWNER` / `GITEA_DEFAULT_REPO` env vars (set at server start).
-3. The `resolve_repo` tool (detects owner/repo from a local git remote).
+2. `GITEA_DEFAULT_OWNER` / `GITEA_DEFAULT_REPO` env vars (or the git-discovered defaults
+   captured at server start).
+3. The `resolve_repo` tool (re-reads `.git/config` and returns `baseUrl`, `owner`, `repo`,
+   the selected `remote`, and every parsed remote under `remotes`).
 
-If neither argument nor env var is set, the call errors. Before a batch of work on a
-repo you have not used this session, call `resolve_repo` (or confirm the env defaults)
-once and reuse the result — do not guess.
+If none resolve, the call errors. Before a batch of work on a repo you have not used this
+session, call `resolve_repo` once and reuse the result — do not guess.
 
 ## Labels: IDs vs names (critical gotcha)
 
@@ -59,5 +70,6 @@ Confirm the target id/index and scope with the user before calling. For labels,
 ## Error format
 
 Failed calls throw `Gitea API error (<status>): <body>`. Read the status: 401/403 →
-token scope/expiry; 404 → wrong owner/repo or no permission; 409 → conflict;
-422 → validation. Do not retry blindly on 4xx.
+token missing, wrong, or lacks scope — run the **gitea-configure** skill to fix the
+connection; 404 → wrong owner/repo or no permission; 409 → conflict; 422 → validation.
+Do not retry blindly on 4xx.
