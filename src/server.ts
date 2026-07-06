@@ -29,6 +29,7 @@ import {
   ResolveRepoSchema,
   ListMyReposSchema,
 } from "./tools.js";
+import { parseRemotes, selectRemote } from "./git-config.js";
 
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -38,21 +39,9 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
 
-function parseGitRemoteUrl(remoteUrl: string): { owner: string; repo: string } | null {
-  // SSH: git@host:owner/repo.git
-  const sshMatch = remoteUrl.match(/^[^:]+:([^/]+)\/([^/]+?)(?:\.git)?$/);
-  if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
-
-  // HTTPS: https://host/owner/repo.git
-  const httpsMatch = remoteUrl.match(/^https?:\/\/[^/]+\/([^/]+)\/([^/]+?)(?:\.git)?$/);
-  if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
-
-  return null;
-}
-
 export async function createServer(
   baseUrl: string,
-  token: string,
+  token?: string,
   defaultOwner?: string,
   defaultRepo?: string,
 ) {
@@ -474,26 +463,36 @@ export async function createServer(
     "resolve_repo",
     {
       description:
-        "Detect owner/repo from a git repository's `origin` remote URL (SSH or HTTPS). `path` defaults to the current directory. Call ONCE at the start of a session to establish owner/repo for later calls instead of guessing. Errors if there is no `origin` remote or the URL cannot be parsed.",
+        "Detect baseUrl/owner/repo from a git repository's remotes (SSH or HTTPS). Reads `upstream` first, then `origin`, then any other remote; all discovered remotes are returned. `path` defaults to the current directory. Call ONCE at the start of a session to establish owner/repo for later calls instead of guessing. Errors if no parseable remote is found.",
       inputSchema: ResolveRepoSchema.shape,
     },
     async (input) => {
       const dir = input.path || process.cwd();
       const gitConfigPath = join(dir, ".git", "config");
       const content = await readFile(gitConfigPath, "utf-8");
-      const remoteMatch = content.match(/\[remote "origin"\]\s*\n(?:.*\n)*?\s*url\s*=\s*(.+)$/m);
-      if (!remoteMatch) {
-        throw new Error(`No "origin" remote found in ${gitConfigPath}`);
+      const parsed = parseRemotes(content);
+      if (parsed.length === 0) {
+        throw new Error(`No parseable git remotes found in ${gitConfigPath}`);
       }
-      const remoteUrl = remoteMatch[1].trim();
-      const parsed = parseGitRemoteUrl(remoteUrl);
-      if (!parsed) {
-        throw new Error(`Cannot parse remote URL: ${remoteUrl}`);
+      const selected = selectRemote(parsed);
+      if (!selected) {
+        throw new Error(`No parseable git remote found in ${gitConfigPath}`);
+      }
+      const remotes: Record<string, { baseUrl: string; owner: string; repo: string; url: string }> = {};
+      for (const r of parsed) {
+        remotes[r.remote] = { baseUrl: r.baseUrl, owner: r.owner, repo: r.repo, url: r.url };
       }
       return {
         content: [{
           type: "text",
-          text: JSON.stringify({ ...parsed, remote_url: remoteUrl }, null, 2),
+          text: JSON.stringify({
+            baseUrl: selected.baseUrl,
+            owner: selected.owner,
+            repo: selected.repo,
+            remote: selected.remote,
+            remote_url: selected.url,
+            remotes,
+          }, null, 2),
         }],
       };
     },
@@ -698,7 +697,7 @@ export async function createServer(
 
 export async function runServer(
   baseUrl: string,
-  token: string,
+  token?: string,
   defaultOwner?: string,
   defaultRepo?: string,
 ) {

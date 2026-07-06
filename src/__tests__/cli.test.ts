@@ -1,32 +1,30 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { runServer } from "../server.js";
+import { discoverConfig } from "../git-config.js";
 
 vi.mock("../server.js", () => ({
   runServer: vi.fn(),
+}));
+
+vi.mock("../git-config.js", () => ({
+  discoverConfig: vi.fn(),
 }));
 
 vi.mock("../skills.js", () => ({
   runInitCommand: vi.fn(),
 }));
 
-const REQUIRED_MESSAGE = "GITEA_BASE_URL and GITEA_TOKEN environment variables are required";
+const SKIP_PREFIX = "gitea-mcp: no git remote found in";
 
 describe("cli entry point", () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let errSpy: ReturnType<typeof vi.spyOn>;
-  let savedEnv: NodeJS.ProcessEnv;
   let savedArgv: string[];
 
   beforeEach(() => {
     vi.resetModules();
-    savedEnv = { ...process.env };
     savedArgv = process.argv.slice();
-    // Deterministic argv so tests do not depend on the vitest runner's flags.
     process.argv = ["node", "cli.js"];
-    delete process.env.GITEA_BASE_URL;
-    delete process.env.GITEA_TOKEN;
-    delete process.env.GITEA_DEFAULT_OWNER;
-    delete process.env.GITEA_DEFAULT_REPO;
     exitSpy = vi
       .spyOn(process, "exit")
       .mockImplementation(((code?: number) => {
@@ -34,60 +32,60 @@ describe("cli entry point", () => {
       }) as never);
     errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(runServer).mockReset();
+    vi.mocked(discoverConfig).mockReset();
   });
 
   afterEach(() => {
-    process.env = savedEnv;
     process.argv = savedArgv;
     vi.restoreAllMocks();
   });
 
-  it("exits with code 1 when GITEA_BASE_URL is missing", async () => {
-    process.env.GITEA_TOKEN = "t";
-    await expect(import("../cli.js")).rejects.toThrow("process.exit(1)");
-    expect(errSpy).toHaveBeenCalledWith(REQUIRED_MESSAGE);
+  it("exits 0 with a skip reason when no config can be discovered", async () => {
+    vi.mocked(discoverConfig).mockResolvedValue(null);
+    await expect(import("../cli.js")).rejects.toThrow("process.exit(0)");
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining(SKIP_PREFIX));
     expect(runServer).not.toHaveBeenCalled();
   });
 
-  it("exits with code 1 when GITEA_TOKEN is missing", async () => {
-    process.env.GITEA_BASE_URL = "https://g.example";
-    await expect(import("../cli.js")).rejects.toThrow("process.exit(1)");
-    expect(errSpy).toHaveBeenCalledWith(REQUIRED_MESSAGE);
-    expect(runServer).not.toHaveBeenCalled();
-  });
-
-  it("exits with code 1 when both required vars are missing", async () => {
-    await expect(import("../cli.js")).rejects.toThrow("process.exit(1)");
-    expect(errSpy).toHaveBeenCalledWith(REQUIRED_MESSAGE);
-    expect(runServer).not.toHaveBeenCalled();
-  });
-
-  it("calls runServer with env values when required vars are present", async () => {
-    process.env.GITEA_BASE_URL = "https://g.example";
-    process.env.GITEA_TOKEN = "tok";
+  it("starts the server with the discovered baseUrl/token/owner/repo", async () => {
+    vi.mocked(discoverConfig).mockResolvedValue({
+      baseUrl: "https://gitea.example",
+      token: "tok",
+      defaultOwner: "owner",
+      defaultRepo: "repo",
+      remote: "origin",
+      source: "git",
+    });
     vi.mocked(runServer).mockResolvedValue(undefined);
     await import("../cli.js");
     await vi.waitFor(() => {
-      expect(runServer).toHaveBeenCalledWith("https://g.example", "tok", undefined, undefined);
+      expect(runServer).toHaveBeenCalledWith("https://gitea.example", "tok", "owner", "repo");
     });
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
-  it("passes GITEA_DEFAULT_OWNER and GITEA_DEFAULT_REPO through", async () => {
-    process.env.GITEA_BASE_URL = "https://g.example";
-    process.env.GITEA_TOKEN = "tok";
-    process.env.GITEA_DEFAULT_OWNER = "myorg";
-    process.env.GITEA_DEFAULT_REPO = "myrepo";
+  it("starts the server with an undefined token when discovery yields none", async () => {
+    vi.mocked(discoverConfig).mockResolvedValue({
+      baseUrl: "https://gitea.example",
+      token: undefined,
+      defaultOwner: "owner",
+      defaultRepo: "repo",
+      remote: "origin",
+      source: "git",
+    });
     vi.mocked(runServer).mockResolvedValue(undefined);
     await import("../cli.js");
     await vi.waitFor(() => {
-      expect(runServer).toHaveBeenCalledWith("https://g.example", "tok", "myorg", "myrepo");
+      expect(runServer).toHaveBeenCalledWith("https://gitea.example", undefined, "owner", "repo");
     });
   });
 
-  it("logs a fatal error and exits when runServer rejects", async () => {
-    process.env.GITEA_BASE_URL = "https://g.example";
-    process.env.GITEA_TOKEN = "tok";
+  it("logs a fatal error and exits 1 when runServer rejects", async () => {
+    vi.mocked(discoverConfig).mockResolvedValue({
+      baseUrl: "https://gitea.example",
+      token: "tok",
+      source: "git",
+    });
     exitSpy.mockImplementation((() => undefined) as never);
     vi.mocked(runServer).mockRejectedValue(new Error("boom"));
     await import("../cli.js");
@@ -106,10 +104,11 @@ describe("cli entry point", () => {
       expect(skills.runInitCommand).toHaveBeenCalledWith(["--tool", "claude"]);
     });
     expect(runServer).not.toHaveBeenCalled();
+    expect(discoverConfig).not.toHaveBeenCalled();
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
-  it("logs a fatal error and exits when runInitCommand rejects", async () => {
+  it("logs a fatal error and exits 1 when runInitCommand rejects", async () => {
     process.argv = ["node", "cli.js", "init"];
     exitSpy.mockImplementation((() => undefined) as never);
     const skills = await import("../skills.js");

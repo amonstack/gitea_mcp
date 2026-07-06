@@ -1,6 +1,7 @@
 export interface GiteaConfig {
   baseUrl: string;
-  token: string;
+  /** Omitted when no token source resolves; requests are then anonymous and a Skill guides the user. */
+  token?: string;
 }
 
 export interface Issue {
@@ -154,7 +155,7 @@ export interface UpdateMilestoneParams {
 
 export class GiteaClient {
   private baseUrl: string;
-  private token: string;
+  private token?: string;
 
   constructor(config: GiteaConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
@@ -167,10 +168,8 @@ export class GiteaClient {
     body?: unknown,
   ): Promise<T> {
     const url = `${this.baseUrl}/api/v1${path}`;
-    const headers: Record<string, string> = {
-      "Authorization": `token ${this.token}`,
-      "Accept": "application/json",
-    };
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (this.token) headers["Authorization"] = `token ${this.token}`;
 
     const init: RequestInit = { method, headers };
     if (body !== undefined) {

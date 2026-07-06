@@ -50,12 +50,46 @@ node dist/cli.js
 
 ## 配置
 
+所有变量都是可选的——`gitea-mcp` 会从项目本地 git 配置自动发现 Gitea 实例、仓库和令牌，
+因此一次全局安装即可服务多个项目。仅在需要覆盖自动发现结果时才设置它们。
+
 | 变量 | 必填 | 说明 |
 |------|:----:|------|
-| `GITEA_BASE_URL` | 是 | Gitea 实例地址（如 `https://gitea.example.com`） |
-| `GITEA_TOKEN` | 是 | Gitea API 访问令牌 |
+| `GITEA_BASE_URL` | 否 | Gitea 实例地址（如 `https://gitea.example.com`）。未设置时从项目 git 远程地址自动推导。 |
+| `GITEA_TOKEN` | 否 | Gitea API 访问令牌。依次从 `.git/config`、git 凭据存储、本变量解析（见[令牌发现](#令牌发现)）。 |
 | `GITEA_DEFAULT_OWNER` | 否 | 默认仓库所有者，免去每次传入 `owner` 参数 |
 | `GITEA_DEFAULT_REPO` | 否 | 默认仓库名称，免去每次传入 `repo` 参数 |
+
+### 自动发现的工作方式
+
+启动时，`gitea-mcp` 读取 `<cwd>/.git/config` 并推导：
+
+- **实例地址** —— 取自选中远程地址的 host。SSH 远程（`git@host:owner/repo`）会被推导为
+  `https://host`。可用 `GITEA_BASE_URL` 覆盖。
+- **owner / repo** —— 取自选中远程地址。可用 `GITEA_DEFAULT_OWNER` / `GITEA_DEFAULT_REPO`
+  覆盖，或随时用 `resolve_repo` 工具检测。
+- **远程选择** —— 优先 `upstream`，回退 `origin`，再回退其它远程。两者不同时 `resolve_repo`
+  会同时返回。
+
+若当前目录没有 git 远程、且未设置 `GITEA_BASE_URL`，服务器**不会启动**——它会打印跳过原因并
+以 exit 0 退出。请在克隆的 Gitea 仓库内运行，或显式设置 `GITEA_BASE_URL` / `GITEA_TOKEN`。
+
+### 令牌发现
+
+令牌按以下顺序解析（先匹配者胜出）：
+
+1. `.git/config` 中的 `[gitea "<baseUrl>"]` 段：
+   ```ini
+   [gitea "https://gitea.example.com"]
+       token = <your-token>
+   ```
+   不带地址的 `[gitea]` 段中的 `token = ...` 作为全局兜底。
+2. git 凭据存储（`~/.git-credentials`，或 `$XDG_CONFIG_HOME/git/credentials`）——host 匹配实例
+   的那一行，如 `https://oauth2:<token>@gitea.example.com`。
+3. `GITEA_TOKEN` 环境变量。
+
+若都未解析到，服务器仍会以匿名方式启动。公开仓库可读；私有仓库和写操作返回 `401`——此时使用
+`gitea-configure` 技能引导配置，或设置 `GITEA_TOKEN`。
 
 设置 `GITEA_DEFAULT_OWNER` 和 `GITEA_DEFAULT_REPO` 后，调用工具时可以省略
 `owner` 和 `repo` 参数。也可以使用 `resolve_repo` 工具自动从本地 git 仓库
@@ -126,8 +160,15 @@ gitea-mcp init --dir /exact/path    # 自定义路径
 
 ### 其他 MCP 客户端
 
-任何支持 stdio 方式运行 MCP 服务端的客户端都可以使用。安装完成后设置环境
-变量并启动：
+ 任何支持 stdio 方式运行 MCP 服务端的客户端都可以使用。安装完成后，在克隆的 Gitea 仓库内
+ 吏动即可（配置会自动发现）：
+
+```bash
+cd /path/to/your/gitea-repo
+gitea-mcp
+```
+
+也可显式设置环境变量：
 
 ```bash
 export GITEA_BASE_URL="https://gitea.example.com"
@@ -185,7 +226,7 @@ gitea-mcp
 | 工具 | 说明 |
 |------|------|
 | `list_my_repos` | 列出当前用户可访问的仓库 |
-| `resolve_repo` | 从本地 git 仓库的远程地址自动检测 `owner` 和 `repo` |
+| `resolve_repo` | 从项目 git 远程地址检测 `baseUrl`、`owner`、`repo`（优先 `upstream`，回退 `origin`） |
 
 ## AI 引导与技能
 
@@ -216,6 +257,7 @@ gitea-mcp
 | `gitea-summarize-issue` | 读取并总结某 issue 的讨论 |
 | `gitea-plan-milestones` | 创建 / 编辑 / 关闭里程碑 |
 | `gitea-resolve-repo` | 解析 owner/repo 或列出仓库 |
+| `gitea-configure` | 修复连接——实例地址、令牌或 401/403 报错 |
 
 每个技能都是面向 AI 的简短动作流程（目的、何时用、何时不用、规则、先检查什么）。
 创建、评论、里程碑三类技能还内嵌**正文模板**（bug / 新功能 / 性能 issue、评论、

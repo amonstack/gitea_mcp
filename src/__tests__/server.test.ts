@@ -188,16 +188,21 @@ describe("resolve_repo handler", () => {
     vi.mocked(GiteaClient).mockImplementation(function () { return mockClient; } as never);
   });
 
-  it("parses an SSH remote URL", async () => {
+  it("parses an SSH remote and derives an https baseUrl", async () => {
     vi.mocked(readFile).mockResolvedValue('[remote "origin"]\n\turl = git@gitea.example:owner/repo.git\n');
     const { createServer } = await import("../server.js");
     const server = await createServer("https://g", "t");
     const result = await registeredTools(server as never)["resolve_repo"].handler({ path: "/repo" });
     expect(readFile).toHaveBeenCalledWith("/repo/.git/config", "utf-8");
     expect(JSON.parse(result.content[0].text)).toEqual({
+      baseUrl: "https://gitea.example",
       owner: "owner",
       repo: "repo",
+      remote: "origin",
       remote_url: "git@gitea.example:owner/repo.git",
+      remotes: {
+        origin: { baseUrl: "https://gitea.example", owner: "owner", repo: "repo", url: "git@gitea.example:owner/repo.git" },
+      },
     });
   });
 
@@ -206,20 +211,35 @@ describe("resolve_repo handler", () => {
     const { createServer } = await import("../server.js");
     const server = await createServer("https://g", "t");
     const result = await registeredTools(server as never)["resolve_repo"].handler({ path: "/repo" });
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      baseUrl: "https://gitea.example",
       owner: "owner",
       repo: "repo",
-      remote_url: "https://gitea.example/owner/repo",
+      remote: "origin",
     });
   });
 
-  it("throws when no origin remote is found", async () => {
+  it("prefers the upstream remote over origin and surfaces both", async () => {
+    vi.mocked(readFile).mockResolvedValue(
+      '[remote "origin"]\n\turl = https://gitea.example/origin/repo.git\n[remote "upstream"]\n\turl = https://gitea.example/upstream/repo.git\n',
+    );
+    const { createServer } = await import("../server.js");
+    const server = await createServer("https://g", "t");
+    const result = await registeredTools(server as never)["resolve_repo"].handler({ path: "/repo" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.remote).toBe("upstream");
+    expect(parsed.owner).toBe("upstream");
+    expect(parsed.remote_url).toBe("https://gitea.example/upstream/repo.git");
+    expect(Object.keys(parsed.remotes).sort()).toEqual(["origin", "upstream"]);
+  });
+
+  it("throws when no parseable remotes are found", async () => {
     vi.mocked(readFile).mockResolvedValue("");
     const { createServer } = await import("../server.js");
     const server = await createServer("https://g", "t");
     await expect(
       registeredTools(server as never)["resolve_repo"].handler({ path: "/repo" }),
-    ).rejects.toThrow('No "origin" remote found');
+    ).rejects.toThrow("No parseable git remotes found");
   });
 
   it("throws when the remote URL cannot be parsed", async () => {
@@ -228,6 +248,6 @@ describe("resolve_repo handler", () => {
     const server = await createServer("https://g", "t");
     await expect(
       registeredTools(server as never)["resolve_repo"].handler({ path: "/repo" }),
-    ).rejects.toThrow("Cannot parse remote URL");
+    ).rejects.toThrow("No parseable git remotes found");
   });
 });
