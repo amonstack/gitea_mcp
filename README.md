@@ -42,7 +42,7 @@ The server communicates over stdio and wraps the [Gitea REST API (`/api/v1`)](ht
 
 ## Requirements
 
-- **Node.js ≥ 18** — uses the global `fetch`
+- **Node.js ≥ 24** — uses the global `fetch`
 - A **Gitea instance** (self-hosted or Gitea Cloud) reachable over HTTP
 - A **Gitea API token** (or a git credential-store entry) for anything beyond reading public repositories
 

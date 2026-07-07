@@ -90,7 +90,7 @@ This section defines the invariants for the TypeScript code — the static struc
 
 - The project is ESM: `"type": "module"`, `"module": "Node16"`. Relative imports MUST use the `.js` extension even for `.ts` sources (e.g. `import { GiteaClient } from "./gitea-client.js"`).
 - MUST import `McpServer` from `@modelcontextprotocol/sdk/server/mcp.js` and `StdioServerTransport` from `@modelcontextprotocol/sdk/server/stdio.js` — the barrel re-export does NOT include `McpServer`.
-- MUST use the global `fetch` (Node ≥ 18); MUST NOT add `axios`, `node-fetch`, or other HTTP clients.
+- MUST use the global `fetch` (Node ≥ 24); MUST NOT add `axios`, `node-fetch`, or other HTTP clients.
 - Node built-ins are imported with the `node:` prefix (`node:fs/promises`, `node:path`, `node:module`).
 - `package.json` is the single source of dependency truth; after adding or removing a dependency MUST run `npm install` so `package-lock.json` stays in sync.
 
@@ -112,7 +112,7 @@ Violation Signals (each pattern below indicates a breach of the rules above):
 
 ### 2.4 Toolchain and Dependencies
 
-- Runtime: Node ≥ 18 (global `fetch`). TypeScript `target: ES2022`, `strict: true`; `declaration` and `sourceMap` are emitted.
+- Runtime: Node ≥ 24 (global `fetch`). TypeScript `target: ES2022`, `strict: true`; `declaration` and `sourceMap` are emitted.
 - Build is plain `tsc` (no bundler); the published package ships only the compiled `dist/`.
 - Key dependencies: `@modelcontextprotocol/sdk` (server + stdio transport), `zod` (tool input schemas). Dev: `tsx` (dev runner), `vitest` (test runner), `typescript`.
 

@@ -47,7 +47,7 @@ Per-call flow:
 
 | Concern | Choice |
 |---------|--------|
-| Runtime | Node.js ≥ 18 (uses the global `fetch`) |
+| Runtime | Node.js ≥ 24 (uses the global `fetch`) |
 | Language | TypeScript, `target: ES2022`, `strict: true`; emits `declaration` + `sourceMap` |
 | Module system | ESM (`"type": "module"`, `"module": "Node16"`) |
 | Build | Plain `tsc` (no bundler) — `src/` → `dist/` |
