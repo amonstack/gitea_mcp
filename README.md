@@ -1,12 +1,17 @@
-# gitea-mcp
+<p align="center">
+  <img alt="gitea-mcp" src="https://raw.githubusercontent.com/amonstack/gitea_mcp/master/docs/assets/gitea-mcp-banner.png" />
+  <h3 align="center">gitea-mcp</h3>
+  <p align="center">MCP server that exposes Gitea issues, labels, milestones, and comments as tools for AI assistants</p>
+</p>
+
+---
 
 [![npm version](https://img.shields.io/npm/v/@amonstack/gitea-mcp?logo=npm)](https://www.npmjs.com/package/@amonstack/gitea-mcp)
+[![codecov](https://codecov.io/gh/amonstack/gitea_mcp/branch/master/graph/badge.svg)](https://codecov.io/gh/amonstack/gitea_mcp)
 [![license](https://img.shields.io/npm/l/@amonstack/gitea-mcp)](https://github.com/amonstack/gitea_mcp/blob/master/LICENSE)
 [![Node](https://img.shields.io/node/v/@amonstack/gitea-mcp?logo=node.js)](https://www.npmjs.com/package/@amonstack/gitea-mcp)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![MCP](https://img.shields.io/badge/MCP-server-6f42c1?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
-
-MCP server that exposes Gitea issues, labels, milestones, and comments as tools for AI assistants.
 
 **English** | [中文文档](https://github.com/amonstack/gitea_mcp/blob/master/README.zh-CN.md)
 

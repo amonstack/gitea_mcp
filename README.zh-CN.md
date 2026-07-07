@@ -1,12 +1,17 @@
-# gitea-mcp
+<p align="center">
+  <img alt="gitea-mcp" src="https://raw.githubusercontent.com/amonstack/gitea_mcp/master/docs/assets/gitea-mcp-banner.png" />
+  <h3 align="center">gitea-mcp</h3>
+  <p align="center">MCP 服务端，将 Gitea 的议题、标签、里程碑与评论封装为工具，供 AI 助手调用</p>
+</p>
+
+---
 
 [![npm version](https://img.shields.io/npm/v/@amonstack/gitea-mcp?logo=npm)](https://www.npmjs.com/package/@amonstack/gitea-mcp)
+[![codecov](https://codecov.io/gh/amonstack/gitea_mcp/branch/master/graph/badge.svg)](https://codecov.io/gh/amonstack/gitea_mcp)
 [![license](https://img.shields.io/npm/l/@amonstack/gitea-mcp)](https://github.com/amonstack/gitea_mcp/blob/master/LICENSE)
 [![Node](https://img.shields.io/node/v/@amonstack/gitea-mcp?logo=node.js)](https://www.npmjs.com/package/@amonstack/gitea-mcp)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![MCP](https://img.shields.io/badge/MCP-server-6f42c1?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
-
-MCP 服务端，将 Gitea 的议题、标签、里程碑与评论封装为工具，供 AI 助手调用。
 
 [English](https://github.com/amonstack/gitea_mcp/blob/master/README.md) | **中文文档**
 
