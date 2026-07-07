@@ -42,7 +42,7 @@
 
 ## 环境要求
 
-- **Node.js ≥ 18** —— 使用全局 `fetch`
+- **Node.js ≥ 24** —— 使用全局 `fetch`
 - 一个可通过 HTTP 访问的 **Gitea 实例**（自托管或 Gitea Cloud）
 - 一个 **Gitea API 令牌**（或 git 凭据存储条目），用于读取公开仓库以外的操作
 
