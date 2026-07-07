@@ -1,4 +1,4 @@
-.PHONY: all install lint build build-assets assets test test-watch test-integration smoke scan clean dev package publish verify
+.PHONY: all install lint build build-assets assets test test-watch test-integration coverage smoke scan clean dev package publish verify
 
 all: lint build
 
@@ -24,6 +24,9 @@ test-watch:
 
 test-integration:
 	npm run test:integration
+
+coverage:
+	npm run test:coverage
 
 smoke: build
 	npm run smoke

@@ -27,6 +27,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:coverage": "vitest run --coverage",
     "smoke": "node scripts/smoke.mjs",
     "scan": "gitleaks detect --source . --redact --report-format json -r .dist/leaks.json --no-banner"
   },
@@ -49,6 +50,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
