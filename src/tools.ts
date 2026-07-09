@@ -189,4 +189,44 @@ export const ListMyReposSchema = z.object({
   limit: z.number().int().min(1).max(100).optional().describe("Results per page"),
 });
 
+export const ListTopicsSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  page: z.number().int().min(1).optional().describe("Page number"),
+  limit: z.number().int().min(1).max(100).optional().describe("Results per page"),
+});
+
+export const ReplaceTopicsSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  topics: z
+    .array(
+      z
+        .string()
+        .regex(/^[a-z0-9][a-z0-9-]*$/)
+        .max(35),
+    )
+    .describe("Full list of topic names to set (REPLACES the entire set). Lowercase letters, digits, and hyphens; start with a letter/digit."),
+});
+
+export const AddTopicSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  topic: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]*$/)
+    .max(35)
+    .describe("Topic name to add. Lowercase letters, digits, and hyphens; must start with a letter or digit."),
+});
+
+export const RemoveTopicSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  topic: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]*$/)
+    .max(35)
+    .describe("Topic name to remove. Lowercase letters, digits, and hyphens; must start with a letter or digit."),
+});
+
 export const GiteaStatusSchema = z.object({});

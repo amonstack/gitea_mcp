@@ -46,3 +46,10 @@ Use this to read results correctly and pick the right identifier.
 ## Repo (from list_my_repos)
 - `id`, `full_name`, `name`, `owner` (User), `description?`, `html_url`,
   `default_branch?`, `created_at`, `updated_at`
+
+## Topic list (from list_topics / replace_topics)
+- `topics` (string[]) — the repository's topic names. Each name is lowercase
+  letters, digits, and hyphens, starting with a letter/digit, max 35 chars.
+  `replace_topics` sends this object back to SET the whole set (empty array
+  clears all topics); `add_topic` / `remove_topic` operate on a single name and
+  return no body.

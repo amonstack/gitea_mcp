@@ -22,7 +22,7 @@ requests against the [Gitea REST API (`/api/v1`)](https://docs.gitea.com/api/1.2
 ┌───────────────┐     stdio      ┌──────────────────────────────┐     HTTPS     ┌──────────────────────┐
 │  MCP Client   │ ◄──────────► │  McpServer (server.ts)       │ ◄──────────► │  Gitea /api/v1       │
 │  (Claude,     │   JSON-RPC   │   ├─ tools.ts (Zod schemas)  │   token/basic │  (issues, labels,    │
-│   opencode…)  │              │   └─ GiteaClient.request<T>  │   auth        │   milestones, …)     │
+│   opencode…)  │              │   └─ GiteaClient.request<T>  │   auth        │   milestones, topics,…)│
 └───────────────┘              └──────────────────────────────┘               └──────────────────────┘
         ▲
         │ env (all optional overrides): GITEA_BASE_URL, GITEA_TOKEN, GITEA_DEFAULT_OWNER, GITEA_DEFAULT_REPO

@@ -1,6 +1,6 @@
 # Gitea MCP — usage strategy
 
-You manage Gitea issues, comments, labels, and milestones through this MCP server.
+You manage Gitea issues, comments, labels, milestones, and repository topics through this MCP server.
 Every tool returns Gitea's JSON verbatim as text. Follow these rules to use them
 correctly.
 
@@ -57,6 +57,7 @@ These are irreversible on most Gitea instances (no trash/recycle):
 
 - `delete_issue`, `delete_label`, `delete_milestone`, `delete_comment`
 - `clear_issue_labels`, `replace_issue_labels` (replaces the ENTIRE label set)
+- `replace_topics` (replaces the ENTIRE topic set; pass `[]` to clear all topics)
 
 Confirm the target id/index and scope with the user before calling. For labels,
 `replace_issue_labels` overwrites — read current labels first if any must survive.

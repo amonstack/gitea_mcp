@@ -1,7 +1,7 @@
 <p align="center">
   <img alt="gitea-mcp" src="https://raw.githubusercontent.com/amonstack/gitea_mcp/master/docs/assets/gitea-mcp-banner.png" />
   <h3 align="center">gitea-mcp</h3>
-  <p align="center">MCP 服务端，将 Gitea 的议题、标签、里程碑与评论封装为工具，供 AI 助手调用</p>
+  <p align="center">MCP 服务端，将 Gitea 的议题、标签、里程碑、评论与主题封装为工具，供 AI 助手调用</p>
 </p>
 
 ---
@@ -15,13 +15,13 @@
 
 [English](https://github.com/amonstack/gitea_mcp/blob/master/README.md) | **中文文档**
 
-`gitea-mcp` 是一个 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 服务端，将 Gitea 仓库操作暴露为 MCP 工具。连接到 MCP 客户端（Claude Desktop、opencode、Cursor 等）后，AI 助手即可通过自然语言在 Gitea 实例上创建、查询、更新和删除议题、标签、里程碑和评论。
+`gitea-mcp` 是一个 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 服务端，将 Gitea 仓库操作暴露为 MCP 工具。连接到 MCP 客户端（Claude Desktop、opencode、Cursor 等）后，AI 助手即可通过自然语言在 Gitea 实例上创建、查询、更新和删除议题、标签、里程碑、评论和主题。
 
 服务端通过 stdio 通信，封装了 [Gitea REST API (`/api/v1`)](https://docs.gitea.com/api/1.22/)。
 
 ## 功能特性
 
-- **完整的 Gitea 项目管理** —— 通过自然语言管理议题、标签、里程碑与评论
+- **完整的 Gitea 项目管理** —— 通过自然语言管理议题、标签、里程碑、评论与主题
 - **零配置自动发现** —— 从项目 git 配置读取 `baseUrl`、`owner`、`repo` 与令牌；一次全局安装即可服务多个仓库
 - **多来源认证 + 自动容错** —— 依次尝试 `[gitea]` 配置令牌、`GITEA_TOKEN`、git 凭据存储，遇 `401`/`403` 自动切换
 - **按动作划分的技能** —— 每个工作流一个技能（查找、创建、打标签、评论、规划里程碑……），适配 opencode、Claude Code、Cursor 等
@@ -271,6 +271,15 @@ gitea-mcp
 | `create_milestone` | 创建里程碑，支持 `title`、`description`、`due_on` |
 | `update_milestone` | 更新里程碑字段或 `state` |
 | `delete_milestone` | 按 `id` 删除里程碑 |
+
+### 主题 (Topics)
+
+| 工具 | 说明 |
+|------|------|
+| `list_topics` | 列出仓库的主题（标签） |
+| `replace_topics` | 用指定列表替换全部主题（传 `[]` 即清空） |
+| `add_topic` | 按名称添加单个主题 |
+| `remove_topic` | 按名称移除单个主题 |
 
 ### 仓库辅助 (Repository Helpers)
 
