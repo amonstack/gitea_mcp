@@ -28,6 +28,10 @@ import {
   DeleteMilestoneSchema,
   ResolveRepoSchema,
   ListMyReposSchema,
+  ListTopicsSchema,
+  ReplaceTopicsSchema,
+  AddTopicSchema,
+  RemoveTopicSchema,
   GiteaStatusSchema,
 } from "./tools.js";
 import { parseRemotes, selectRemote } from "./git-config.js";
@@ -457,6 +461,72 @@ export async function createServer(
       await client.deleteMilestone(owner, repo, input.id);
       return {
         content: [{ type: "text", text: `Milestone #${input.id} deleted.` }],
+      };
+    },
+  );
+
+  // ── Topics ──
+
+  server.registerTool(
+    "list_topics",
+    {
+      description:
+        "List a repository's topics (tags). Returns the topic name list for the repo — useful to inspect classification before editing. Topic names are lowercase letters, digits, and hyphens. Paginated (page 1-based, limit <= 100).",
+      inputSchema: ListTopicsSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const topics = await client.listTopics({ ...input, owner, repo });
+      return {
+        content: [{ type: "text", text: JSON.stringify(topics, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "replace_topics",
+    {
+      description:
+        "REPLACE a repository's ENTIRE topic set. `topics` is the full list of topic names that should remain after the call — every existing topic not listed is removed. Pass an empty array to clear all topics. Topic names: lowercase letters, digits, and hyphens, starting with a letter/digit. Read current topics with list_topics first if any must survive; confirm with the user before replacing.",
+      inputSchema: ReplaceTopicsSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const topics = await client.replaceTopics({ ...input, owner, repo });
+      return {
+        content: [{ type: "text", text: JSON.stringify(topics, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "add_topic",
+    {
+      description:
+        "Add ONE topic to a repository by name. Idempotent: adding an existing topic does not error. Topic name: lowercase letters, digits, and hyphens, starting with a letter/digit. To add several topics at once or to set the exact desired set, prefer replace_topics.",
+      inputSchema: AddTopicSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      await client.addTopic(owner, repo, input.topic);
+      return {
+        content: [{ type: "text", text: `Topic '${input.topic}' added to ${owner}/${repo}.` }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "remove_topic",
+    {
+      description:
+        "Remove ONE topic from a repository by name. No error if the topic is not currently on the repo (idempotent delete). Topic name: lowercase letters, digits, and hyphens, starting with a letter/digit. Confirm with the user first.",
+      inputSchema: RemoveTopicSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      await client.removeTopic(owner, repo, input.topic);
+      return {
+        content: [{ type: "text", text: `Topic '${input.topic}' removed from ${owner}/${repo}.` }],
       };
     },
   );

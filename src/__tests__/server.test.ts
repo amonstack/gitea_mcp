@@ -17,6 +17,7 @@ const CLIENT_METHODS = [
   "addIssueLabels", "removeIssueLabel", "replaceIssueLabels", "clearIssueLabels",
   "listMilestones", "getMilestone", "createMilestone", "updateMilestone", "deleteMilestone",
   "listMyRepos", "getCredentialStatus",
+  "listTopics", "replaceTopics", "addTopic", "removeTopic",
 ] as const;
 
 type MockClient = Record<string, ReturnType<typeof vi.fn>>;
@@ -37,6 +38,7 @@ const EXPECTED_TOOLS = [
   "list_labels", "create_label", "update_label", "delete_label",
   "add_issue_labels", "remove_issue_label", "replace_issue_labels", "clear_issue_labels",
   "list_milestones", "get_milestone", "create_milestone", "update_milestone", "delete_milestone",
+  "list_topics", "replace_topics", "add_topic", "remove_topic",
   "resolve_repo", "list_my_repos", "gitea_status",
 ];
 
@@ -187,6 +189,42 @@ describe("tool handlers", () => {
     const result = await registeredTools(server as never)["gitea_status"].handler({});
     expect(mockClient.getCredentialStatus).toHaveBeenCalled();
     expect(JSON.parse(result.content[0].text)).toEqual(status);
+  });
+
+  it("list_topics returns JSON of the client result", async () => {
+    const { createServer } = await import("../server.js");
+    mockClient.listTopics.mockResolvedValue({ topics: ["go", "mcp"] });
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["list_topics"].handler({});
+    expect(mockClient.listTopics).toHaveBeenCalledWith(expect.objectContaining({ owner: "o", repo: "r" }));
+    expect(JSON.parse(result.content[0].text)).toEqual({ topics: ["go", "mcp"] });
+  });
+
+  it("replace_topics spreads owner/repo into the replace params", async () => {
+    const { createServer } = await import("../server.js");
+    mockClient.replaceTopics.mockResolvedValue({ topics: ["go"] });
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["replace_topics"].handler({ topics: ["go"] });
+    expect(mockClient.replaceTopics).toHaveBeenCalledWith({ owner: "o", repo: "r", topics: ["go"] });
+    expect(JSON.parse(result.content[0].text)).toEqual({ topics: ["go"] });
+  });
+
+  it("add_topic forwards owner/repo/topic and returns a confirmation string", async () => {
+    const { createServer } = await import("../server.js");
+    mockClient.addTopic.mockResolvedValue(undefined);
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["add_topic"].handler({ topic: "go" });
+    expect(mockClient.addTopic).toHaveBeenCalledWith("o", "r", "go");
+    expect(result.content[0].text).toBe("Topic 'go' added to o/r.");
+  });
+
+  it("remove_topic forwards owner/repo/topic and returns a confirmation string", async () => {
+    const { createServer } = await import("../server.js");
+    mockClient.removeTopic.mockResolvedValue(undefined);
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["remove_topic"].handler({ topic: "go" });
+    expect(mockClient.removeTopic).toHaveBeenCalledWith("o", "r", "go");
+    expect(result.content[0].text).toBe("Topic 'go' removed from o/r.");
   });
 });
 

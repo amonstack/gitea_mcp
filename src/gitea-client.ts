@@ -190,6 +190,23 @@ export interface UpdateMilestoneParams {
   state?: string;
 }
 
+export interface TopicList {
+  topics: string[];
+}
+
+export interface ListTopicsParams {
+  owner: string;
+  repo: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ReplaceTopicsParams {
+  owner: string;
+  repo: string;
+  topics: string[];
+}
+
 export class GiteaClient {
   private baseUrl: string;
   private candidates: CandidateCredential[];
@@ -567,5 +584,30 @@ export class GiteaClient {
     const query = searchParams.toString();
     const path = `/user/repos${query ? `?${query}` : ""}`;
     return this.request<Repo[]>("GET", path);
+  }
+
+  async listTopics(params: ListTopicsParams): Promise<TopicList> {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.set("page", String(params.page));
+    if (params.limit) searchParams.set("limit", String(params.limit));
+
+    const query = searchParams.toString();
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/topics${query ? `?${query}` : ""}`;
+    return this.request<TopicList>("GET", path);
+  }
+
+  async replaceTopics(params: ReplaceTopicsParams): Promise<TopicList> {
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/topics`;
+    return this.request<TopicList>("PUT", path, { topics: params.topics });
+  }
+
+  async addTopic(owner: string, repo: string, topic: string): Promise<void> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/topics/${encodeURIComponent(topic)}`;
+    return this.request<void>("PUT", path);
+  }
+
+  async removeTopic(owner: string, repo: string, topic: string): Promise<void> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/topics/${encodeURIComponent(topic)}`;
+    return this.request<void>("DELETE", path);
   }
 }

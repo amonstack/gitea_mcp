@@ -9,6 +9,10 @@ import {
   CreateLabelSchema,
   CreateMilestoneSchema,
   ResolveRepoSchema,
+  ListTopicsSchema,
+  ReplaceTopicsSchema,
+  AddTopicSchema,
+  RemoveTopicSchema,
 } from "../tools.js";
 
 describe("ListIssuesSchema", () => {
@@ -136,5 +140,74 @@ describe("ResolveRepoSchema", () => {
   it("accepts path", () => {
     const result = ResolveRepoSchema.parse({ path: "/tmp/repo" });
     expect(result.path).toBe("/tmp/repo");
+  });
+});
+
+describe("ListTopicsSchema", () => {
+  it("accepts minimal input", () => {
+    const result = ListTopicsSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts owner/repo and pagination", () => {
+    const result = ListTopicsSchema.parse({ owner: "o", repo: "r", page: 2, limit: 50 });
+    expect(result.owner).toBe("o");
+    expect(result.page).toBe(2);
+  });
+});
+
+describe("ReplaceTopicsSchema", () => {
+  it("requires topics", () => {
+    const result = ReplaceTopicsSchema.safeParse({ owner: "o", repo: "r" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts an empty list (clears all topics)", () => {
+    const result = ReplaceTopicsSchema.parse({ topics: [] });
+    expect(result.topics).toEqual([]);
+  });
+
+  it("accepts valid lowercase topic names", () => {
+    const result = ReplaceTopicsSchema.parse({ topics: ["go", "mcp-server", "node-js"] });
+    expect(result.topics).toEqual(["go", "mcp-server", "node-js"]);
+  });
+
+  it("rejects uppercase topic names", () => {
+    const result = ReplaceTopicsSchema.safeParse({ topics: ["Go"] });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a topic name starting with a hyphen", () => {
+    const result = ReplaceTopicsSchema.safeParse({ topics: ["-bad"] });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("AddTopicSchema", () => {
+  it("requires topic", () => {
+    const result = AddTopicSchema.safeParse({ owner: "o", repo: "r" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a valid topic name", () => {
+    const result = AddTopicSchema.parse({ topic: "go" });
+    expect(result.topic).toBe("go");
+  });
+
+  it("rejects an uppercase topic name", () => {
+    const result = AddTopicSchema.safeParse({ topic: "GoLang" });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("RemoveTopicSchema", () => {
+  it("requires topic", () => {
+    const result = RemoveTopicSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a valid topic name", () => {
+    const result = RemoveTopicSchema.parse({ topic: "mcp" });
+    expect(result.topic).toBe("mcp");
   });
 });

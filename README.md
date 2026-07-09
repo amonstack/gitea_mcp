@@ -1,7 +1,7 @@
 <p align="center">
   <img alt="gitea-mcp" src="https://raw.githubusercontent.com/amonstack/gitea_mcp/master/docs/assets/gitea-mcp-banner.png" />
   <h3 align="center">gitea-mcp</h3>
-  <p align="center">MCP server that exposes Gitea issues, labels, milestones, and comments as tools for AI assistants</p>
+  <p align="center">MCP server that exposes Gitea issues, labels, milestones, comments, and topics as tools for AI assistants</p>
 </p>
 
 ---
@@ -15,13 +15,13 @@
 
 **English** | [中文文档](https://github.com/amonstack/gitea_mcp/blob/master/README.zh-CN.md)
 
-`gitea-mcp` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes Gitea repository operations as tools. Once connected to an MCP client (Claude Desktop, opencode, Cursor, etc.), an AI assistant can list, create, update, and delete issues, labels, milestones, and comments on your Gitea instance — all through natural language.
+`gitea-mcp` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes Gitea repository operations as tools. Once connected to an MCP client (Claude Desktop, opencode, Cursor, etc.), an AI assistant can list, create, update, and delete issues, labels, milestones, comments, and topics on your Gitea instance — all through natural language.
 
 The server communicates over stdio and wraps the [Gitea REST API (`/api/v1`)](https://docs.gitea.com/api/1.22/).
 
 ## Features
 
-- **Full Gitea project management** — issues, labels, milestones, and comments via natural language
+- **Full Gitea project management** — issues, labels, milestones, comments, and topics via natural language
 - **Zero-config auto-discovery** — reads `baseUrl`, `owner`, `repo`, and token from the project's git config; one global install serves many repos
 - **Multi-source auth with failover** — tries `[gitea]` config tokens, `GITEA_TOKEN`, then the git credential store, advancing automatically on `401`/`403`
 - **Action-scoped skills** — ships one skill per workflow (find, create, label, comment, plan milestones, …) for opencode, Claude Code, Cursor, and more
@@ -284,6 +284,15 @@ gitea-mcp
 | `create_milestone` | Create a milestone with `title`, `description`, `due_on` |
 | `update_milestone` | Update milestone fields or `state` |
 | `delete_milestone` | Delete a milestone by `id` |
+
+### Topics
+
+| Tool | Description |
+|------|-------------|
+| `list_topics` | List a repository's topics (tags) |
+| `replace_topics` | Replace ALL topics with the given list (pass `[]` to clear) |
+| `add_topic` | Add a single topic by name |
+| `remove_topic` | Remove a single topic by name |
 
 ### Repository Helpers
 

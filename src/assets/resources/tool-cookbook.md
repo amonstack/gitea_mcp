@@ -15,6 +15,7 @@ Quick recipes for common goals. Always resolve owner/repo first (explicit args,
 - Issues across repos by keyword / duplicate check → `search_issues({ query, type:
   "issues" })`.
 - Milestone progress → `list_milestones({ state: "all" })` (default omits closed!).
+- Repository topics → `list_topics({})` (returns `{ topics: string[] }`).
 
 ## Create
 - New issue with labels → `list_labels` (to get ids) → `create_issue({ title, body,
@@ -33,6 +34,15 @@ Quick recipes for common goals. Always resolve owner/repo first (explicit args,
 - Delete a label → `delete_label(id)` (removes from EVERY issue).
 - Delete a milestone → prefer `update_milestone({ state: "closed" })`; `delete_milestone`
   detaches its issues (they keep existing, milestone becomes null).
+
+## Topics (repo tags)
+- See current topics → `list_topics({})`.
+- Add ONE → `add_topic({ topic: "go" })` (idempotent; lowercase letters/digits/hyphens,
+  start with a letter/digit, max 35 chars).
+- Remove ONE → `remove_topic({ topic: "go" })` (idempotent delete).
+- Set the exact set / bulk update → `list_topics` first, then
+  `replace_topics({ topics: ["go","mcp"] })` — REPLACES the whole set; pass `[]` to
+  clear. Confirm with the user before replacing.
 
 ## Pagination pattern (all list tools)
 ```

@@ -376,6 +376,69 @@ describe("GiteaClient", () => {
     });
   });
 
+  describe("topics", () => {
+    it("listTopics builds pagination query", async () => {
+      const fetchMock = stubFetch(buildResponse({ topics: [] }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.listTopics({ owner: "o", repo: "r", page: 1, limit: 20 });
+      expect(lastCall(fetchMock).url).toBe("https://g/api/v1/repos/o/r/topics?page=1&limit=20");
+      expect(lastCall(fetchMock).init.method).toBe("GET");
+    });
+
+    it("listTopics omits query when no pagination", async () => {
+      const fetchMock = stubFetch(buildResponse({ topics: ["go"] }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const result = await client.listTopics({ owner: "o", repo: "r" });
+      expect(lastCall(fetchMock).url).toBe("https://g/api/v1/repos/o/r/topics");
+      expect(result).toEqual({ topics: ["go"] });
+    });
+
+    it("replaceTopics puts the full topic list", async () => {
+      const fetchMock = stubFetch(buildResponse({ topics: ["go", "mcp"] }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const result = await client.replaceTopics({ owner: "o", repo: "r", topics: ["go", "mcp"] });
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/o/r/topics");
+      expect(init.method).toBe("PUT");
+      expect(JSON.parse(init.body as string)).toEqual({ topics: ["go", "mcp"] });
+      expect(result).toEqual({ topics: ["go", "mcp"] });
+    });
+
+    it("replaceTopics can send an empty list to clear topics", async () => {
+      const fetchMock = stubFetch(buildResponse({ topics: [] }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.replaceTopics({ owner: "o", repo: "r", topics: [] });
+      expect(JSON.parse(lastCall(fetchMock).init.body as string)).toEqual({ topics: [] });
+    });
+
+    it("addTopic sends PUT to the topic path", async () => {
+      const fetchMock = stubFetch(buildResponse(undefined, 204));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const result = await client.addTopic("o", "r", "go");
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/o/r/topics/go");
+      expect(init.method).toBe("PUT");
+      expect(result).toBeUndefined();
+    });
+
+    it("addTopic URL-encodes the topic name", async () => {
+      const fetchMock = stubFetch(buildResponse(undefined, 204));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.addTopic("o", "r", "node-js");
+      expect(lastCall(fetchMock).url).toBe("https://g/api/v1/repos/o/r/topics/node-js");
+    });
+
+    it("removeTopic sends DELETE to the topic path", async () => {
+      const fetchMock = stubFetch(buildResponse(undefined, 204));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const result = await client.removeTopic("o", "r", "go");
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/o/r/topics/go");
+      expect(init.method).toBe("DELETE");
+      expect(result).toBeUndefined();
+    });
+  });
+
   describe("multi-candidate auth state machine", () => {
     /** Build a candidate with sane defaults. */
     function candidate(overrides: Partial<CandidateCredential>): CandidateCredential {
