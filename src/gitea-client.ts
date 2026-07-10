@@ -273,7 +273,7 @@ export class GiteaClient {
     body: unknown,
     authHeader: string | null,
   ): Promise<T> {
-    const url = `${this.baseUrl}/api/v1${path}`;
+    const url = new URL(`${this.baseUrl}/api/v1${path}`).href;
     const headers: Record<string, string> = { Accept: "application/json" };
     if (authHeader) headers["Authorization"] = authHeader;
 
