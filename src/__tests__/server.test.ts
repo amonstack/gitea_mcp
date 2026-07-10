@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GiteaClient } from "../gitea-client.js";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 
 vi.mock("../gitea-client.js", () => ({
   GiteaClient: vi.fn(),
@@ -8,7 +8,6 @@ vi.mock("../gitea-client.js", () => ({
 
 vi.mock("node:fs/promises", () => ({
   readFile: vi.fn(),
-  stat: vi.fn(),
 }));
 
 const CLIENT_METHODS = [
@@ -235,7 +234,6 @@ describe("resolve_repo handler", () => {
     mockClient = {};
     for (const m of CLIENT_METHODS) mockClient[m] = vi.fn();
     vi.mocked(GiteaClient).mockImplementation(function () { return mockClient; } as never);
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => true } as never);
   });
 
   it("parses an SSH remote and derives an https baseUrl", async () => {
@@ -302,7 +300,6 @@ describe("resolve_repo handler", () => {
   });
 
   it("follows gitdir -> commondir when run inside a git worktree", async () => {
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => false } as never);
     const files: Record<string, string> = {
       "/wt/.git": "gitdir: /data/repo/.git/worktrees/wt\n",
       "/data/repo/.git/worktrees/wt/commondir": "../..\n",

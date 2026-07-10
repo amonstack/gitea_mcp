@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, isAbsolute, resolve } from "node:path";
 import { homedir } from "node:os";
 import {
@@ -229,17 +229,19 @@ export async function resolveGitConfigPath(cwd: string): Promise<string> {
   const dotGit = join(cwd, ".git");
   const conventionalConfig = join(dotGit, "config");
 
-  let isDir = true;
+  // Read .git in a single operation to avoid a TOCTOU race: a separate
+  // stat + readFile would let the entry be swapped between check and use.
+  // EISDIR means .git is a directory (normal repo); ENOENT means absent.
+  let gitFile: string;
   try {
-    isDir = (await stat(dotGit)).isDirectory();
+    gitFile = await readFile(dotGit, "utf-8");
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return conventionalConfig;
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EISDIR" || code === "ENOENT") return conventionalConfig;
     throw err;
   }
-  if (isDir) return conventionalConfig;
 
-  // Linked worktree / submodule: .git is a file beginning with "gitdir:".
-  const gitFile = await readFile(dotGit, "utf-8");
+  // .git is a file — parse the gitdir pointer (worktree / submodule).
   const m = gitFile.match(/^gitdir:\s*(.+?)\s*$/m);
   if (!m) return conventionalConfig;
 

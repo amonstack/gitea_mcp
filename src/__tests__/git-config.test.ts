@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 
-vi.mock("node:fs/promises", () => ({ readFile: vi.fn(), stat: vi.fn() }));
+vi.mock("node:fs/promises", () => ({ readFile: vi.fn() }));
 
 import {
   parseGitRemoteUrl,
@@ -15,11 +15,16 @@ import {
   resolveGitConfigPath,
 } from "../git-config.js";
 
-function mockFiles(files: Record<string, string>): void {
+function mockFiles(files: Record<string, string>, dirs: string[] = []): void {
   vi.mocked(readFile).mockImplementation(async (path) => {
     const p = typeof path === "string" ? path : String(path);
     if (p in files) return files[p];
-    const err = new Error(`ENOENT: ${p}`) as NodeJS.ErrnoException;
+    if (dirs.includes(p)) {
+      const err = new Error(`EISDIR: illegal operation on a directory, read '${p}'`) as NodeJS.ErrnoException;
+      err.code = "EISDIR";
+      throw err;
+    }
+    const err = new Error(`ENOENT: no such file or directory, open '${p}'`) as NodeJS.ErrnoException;
     err.code = "ENOENT";
     throw err;
   });
@@ -273,20 +278,16 @@ describe("resolveGitConfigPath", () => {
   });
 
   it("returns the conventional .git/config when .git is a directory", async () => {
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => true } as never);
+    mockFiles({}, ["/repo/.git"]);
     await expect(resolveGitConfigPath("/repo")).resolves.toBe("/repo/.git/config");
-    expect(stat).toHaveBeenCalledWith("/repo/.git");
   });
 
   it("returns the conventional path when .git does not exist", async () => {
-    const err = new Error("ENOENT") as NodeJS.ErrnoException;
-    err.code = "ENOENT";
-    vi.mocked(stat).mockRejectedValue(err);
+    mockFiles({});
     await expect(resolveGitConfigPath("/repo")).resolves.toBe("/repo/.git/config");
   });
 
   it("follows gitdir -> commondir (relative) to the shared config", async () => {
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => false } as never);
     mockFiles({
       "/wt/.git": "gitdir: /data/repo/.git/worktrees/wt\n",
       "/data/repo/.git/worktrees/wt/commondir": "../..\n",
@@ -295,7 +296,6 @@ describe("resolveGitConfigPath", () => {
   });
 
   it("follows an absolute commondir to the shared config", async () => {
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => false } as never);
     mockFiles({
       "/wt/.git": "gitdir: /private/wt\n",
       "/private/wt/commondir": "/data/repo/.git\n",
@@ -304,7 +304,6 @@ describe("resolveGitConfigPath", () => {
   });
 
   it("reads config directly from the gitdir when no commondir exists (submodule)", async () => {
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => false } as never);
     mockFiles({
       "/sub/.git": "gitdir: /data/repo/.git/modules/sub\n",
     });
@@ -312,7 +311,6 @@ describe("resolveGitConfigPath", () => {
   });
 
   it("resolves a relative gitdir pointer against the cwd", async () => {
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => false } as never);
     mockFiles({
       "/work/sub/.git": "gitdir: ../.git/worktrees/sub\n",
       "/work/.git/worktrees/sub/commondir": "../..\n",
@@ -321,15 +319,16 @@ describe("resolveGitConfigPath", () => {
   });
 
   it("falls back to the conventional path when the .git file has no gitdir line", async () => {
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => false } as never);
     mockFiles({ "/wt/.git": "garbage\n" });
     await expect(resolveGitConfigPath("/wt")).resolves.toBe("/wt/.git/config");
   });
 
-  it("rethrows non-ENOENT stat errors", async () => {
-    const err = new Error("EACCES") as NodeJS.ErrnoException;
-    err.code = "EACCES";
-    vi.mocked(stat).mockRejectedValue(err);
+  it("rethrows non-ENOENT/EISDIR filesystem errors", async () => {
+    vi.mocked(readFile).mockImplementation(async () => {
+      const err = new Error("EACCES") as NodeJS.ErrnoException;
+      err.code = "EACCES";
+      throw err;
+    });
     await expect(resolveGitConfigPath("/repo")).rejects.toThrow("EACCES");
   });
 });
@@ -337,7 +336,6 @@ describe("resolveGitConfigPath", () => {
 describe("discoverConfig", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => true } as never);
   });
 
   it("returns null when there is no .git/config and no GITEA_BASE_URL", async () => {
@@ -347,7 +345,6 @@ describe("discoverConfig", () => {
   });
 
   it("reads config from the common dir when running inside a git worktree", async () => {
-    vi.mocked(stat).mockResolvedValue({ isDirectory: () => false } as never);
     mockFiles({
       "/wt/.git": "gitdir: /data/repo/.git/worktrees/wt\n",
       "/data/repo/.git/worktrees/wt/commondir": "../..\n",
