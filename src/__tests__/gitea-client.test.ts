@@ -58,6 +58,13 @@ describe("GiteaClient", () => {
       expect(lastCall(fetchMock).url).toBe("https://g.example/api/v1/user/repos");
     });
 
+    it("preserves a subpath and strips its trailing slash", () => {
+      const fetchMock = stubFetch(buildResponse([]));
+      const client = new GiteaClient({ baseUrl: "https://g.example/gitea/", token: "tok" });
+      client.listMyRepos();
+      expect(lastCall(fetchMock).url).toBe("https://g.example/gitea/api/v1/user/repos");
+    });
+
     it("rejects a baseUrl with a non-http protocol", () => {
       expect(() => new GiteaClient({ baseUrl: "file:///etc/passwd", token: "t" })).toThrow(
         "must use http or https",
