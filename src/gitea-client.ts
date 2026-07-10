@@ -213,20 +213,20 @@ export class GiteaClient {
 
   constructor(config: GiteaConfig) {
     // baseUrl originates from git config files and flows into outbound fetch
-    // calls — validate it is a well-formed HTTP(S) URL before use.
-    let protocol: string;
+    // calls. Parse and validate it, then reconstruct from URL components so
+    // only sanitized data — never the raw file string — reaches the network.
+    let parsed: URL;
     try {
-      protocol = new URL(config.baseUrl).protocol;
+      parsed = new URL(config.baseUrl);
     } catch {
       throw new Error(`Invalid Gitea baseUrl: ${config.baseUrl}`);
     }
-    if (protocol !== "http:" && protocol !== "https:") {
-      throw new Error(`Gitea baseUrl must use http or https, got: ${protocol}`);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`Gitea baseUrl must use http or https, got: ${parsed.protocol}`);
     }
-    // Strip trailing slashes without regex (avoids ReDoS-class heuristic).
-    let baseUrl = config.baseUrl;
-    while (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1);
-    this.baseUrl = baseUrl;
+    let path = parsed.pathname;
+    while (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+    this.baseUrl = `${parsed.protocol}//${parsed.host}${path === "/" ? "" : path}`;
     if (config.candidates && config.candidates.length > 0) {
       // Defensive copy so external mutation cannot desync the state machine.
       this.candidates = config.candidates.map((c) => ({ ...c }));
