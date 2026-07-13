@@ -530,14 +530,14 @@ describe("GiteaClient", () => {
     });
 
     it("isPullMerged returns false on 404", async () => {
-      const fetchMock = stubFetch(buildResponse("not merged", 404, "Not Found"));
+      stubFetch(buildResponse("not merged", 404, "Not Found"));
       const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
       const merged = await client.isPullMerged("o", "r", 3);
       expect(merged).toBe(false);
     });
 
     it("isPullMerged rethrows non-404 errors", async () => {
-      const fetchMock = stubFetch(buildResponse("server error", 500, "Internal Server Error"));
+      stubFetch(buildResponse("server error", 500, "Internal Server Error"));
       const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
       await expect(client.isPullMerged("o", "r", 3)).rejects.toThrow(GiteaApiError);
     });
