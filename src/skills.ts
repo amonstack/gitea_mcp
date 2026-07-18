@@ -20,8 +20,8 @@ Options:
 
 Supported tools (<name>):
   amazon-q, antigravity, auggie, claude, cline, codex, codebuddy, continue,
-  costrict, crush, cursor, factory, gemini, github-copilot, iflow, kilocode,
-  opencode, qoder, qwen, roocode, windsurf`;
+  costrict, crush, cursor, factory, gemini, github-copilot, iflow, kimi,
+  kilocode, opencode, qoder, qwen, roocode, windsurf`;
 
 export interface InitOptions {
   tool: string;
@@ -44,6 +44,11 @@ export interface ToolTarget {
 /** opencode honors OPENCODE_CONFIG_DIR; everything else is home-relative. */
 function opencodeBase(): string {
   return process.env.OPENCODE_CONFIG_DIR ?? join(homedir(), ".config", "opencode");
+}
+
+/** kimi honors KIMI_CODE_HOME; falls back to ~/.kimi-code. */
+function kimiCodeBase(): string {
+  return process.env.KIMI_CODE_HOME ?? join(homedir(), ".kimi-code");
 }
 
 /**
@@ -73,6 +78,7 @@ export const TOOL_REGISTRY: Record<string, ToolTarget> = {
   gemini: { label: "Gemini CLI", globalSkillsDir: () => home(".gemini", "skills"), projectSkillsDir: join(".gemini", "skills") },
   "github-copilot": { label: "GitHub Copilot", globalSkillsDir: () => home(".config", "github-copilot", "skills"), projectSkillsDir: join(".github", "copilot", "skills") },
   iflow: { label: "iFlow", globalSkillsDir: () => home(".config", "iflow", "skills"), projectSkillsDir: join(".iflow", "skills") },
+  kimi: { label: "Kimi Code CLI", globalSkillsDir: () => join(kimiCodeBase(), "skills"), projectSkillsDir: join(".kimi-code", "skills") },
   kilocode: { label: "Kilo Code", globalSkillsDir: () => home(".kilo", "skills"), projectSkillsDir: join(".kilo", "skills") },
   opencode: { label: "opencode", globalSkillsDir: () => join(opencodeBase(), "skills"), projectSkillsDir: join(".opencode", "skills") },
   qoder: { label: "Qoder", globalSkillsDir: () => home(".config", "qoder", "skills"), projectSkillsDir: join(".qoder", "skills") },

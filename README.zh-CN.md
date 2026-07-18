@@ -205,7 +205,7 @@ gitea-mcp init --dir /exact/path    # 自定义路径
 
 支持的 `--tool` 取值：`amazon-q`、`antigravity`、`auggie`、`claude`、`cline`、
 `codex`、`codebuddy`、`continue`、`costrict`、`crush`、`cursor`、`factory`、
-`gemini`、`github-copilot`、`iflow`、`kilocode`、`opencode`、`qoder`、`qwen`、
+`gemini`、`github-copilot`、`iflow`、`kimi`、`kilocode`、`opencode`、`qoder`、`qwen`、
 `roocode`、`windsurf`。路径遵循各工具约定的 skills 目录；如需精确位置请用 `--dir`。
 随后重启对应工具。详见下方 [AI 引导与技能](#ai-引导与技能)。
 

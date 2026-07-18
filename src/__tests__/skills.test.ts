@@ -54,7 +54,7 @@ describe("tool registry", () => {
   const EXPECTED_TOOLS = [
     "amazon-q", "antigravity", "auggie", "claude", "cline", "codex", "codebuddy",
     "continue", "costrict", "crush", "cursor", "factory", "gemini", "github-copilot",
-    "iflow", "kilocode", "opencode", "qoder", "qwen", "roocode", "windsurf",
+    "iflow", "kimi", "kilocode", "opencode", "qoder", "qwen", "roocode", "windsurf",
   ];
 
   it("registers every supported tool", async () => {
@@ -80,14 +80,17 @@ describe("tool registry", () => {
 });
 
 describe("resolveInstallDir", () => {
-  const SAVED = process.env.OPENCODE_CONFIG_DIR;
+  const SAVED_OC = process.env.OPENCODE_CONFIG_DIR;
+  const SAVED_KC = process.env.KIMI_CODE_HOME;
 
   beforeEach(() => {
     delete process.env.OPENCODE_CONFIG_DIR;
+    delete process.env.KIMI_CODE_HOME;
   });
 
   afterEach(() => {
-    process.env.OPENCODE_CONFIG_DIR = SAVED;
+    process.env.OPENCODE_CONFIG_DIR = SAVED_OC;
+    process.env.KIMI_CODE_HOME = SAVED_KC;
   });
 
   it("--dir wins over --tool and --project", async () => {
@@ -111,6 +114,24 @@ describe("resolveInstallDir", () => {
     const { resolveInstallDir } = await import("../skills.js");
     process.env.OPENCODE_CONFIG_DIR = "/custom/oc";
     expect(resolveInstallDir({ tool: "opencode", project: false })).toBe(join("/custom/oc", "skills"));
+  });
+
+  it("kimi global defaults to ~/.kimi-code/skills", async () => {
+    const { resolveInstallDir } = await import("../skills.js");
+    const dir = resolveInstallDir({ tool: "kimi", project: false });
+    expect(dir.endsWith(join(".kimi-code", "skills"))).toBe(true);
+  });
+
+  it("kimi global honors KIMI_CODE_HOME", async () => {
+    const { resolveInstallDir } = await import("../skills.js");
+    process.env.KIMI_CODE_HOME = "/custom/kc";
+    expect(resolveInstallDir({ tool: "kimi", project: false })).toBe(join("/custom/kc", "skills"));
+  });
+
+  it("kimi project targets .kimi-code/skills", async () => {
+    const { resolveInstallDir } = await import("../skills.js");
+    const dir = resolveInstallDir({ tool: "kimi", project: true });
+    expect(dir.endsWith(join(".kimi-code", "skills"))).toBe(true);
   });
 });
 

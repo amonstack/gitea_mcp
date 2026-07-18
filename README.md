@@ -217,9 +217,9 @@ gitea-mcp init --dir /exact/path    # custom location
 
 Supported `--tool` values: `amazon-q`, `antigravity`, `auggie`, `claude`,
 `cline`, `codex`, `codebuddy`, `continue`, `costrict`, `crush`, `cursor`,
-`factory`, `gemini`, `github-copilot`, `iflow`, `kilocode`, `opencode`, `qoder`,
-`qwen`, `roocode`, `windsurf`. Paths follow each tool's conventional skills
-directory; use `--dir` for an exact location. Then restart your tool. See
+`factory`, `gemini`, `github-copilot`, `iflow`, `kimi`, `kilocode`, `opencode`,
+`qoder`, `qwen`, `roocode`, `windsurf`. Paths follow each tool's conventional
+skills directory; use `--dir` for an exact location. Then restart your tool. See
 [AI Guidance & Skills](#ai-guidance--skills) below.
 
 ### Other MCP Clients
