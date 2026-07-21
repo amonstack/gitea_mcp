@@ -326,6 +326,15 @@ gitea-mcp
 > 而非 tag 名。`create_release` 和 `update_release` 负责维护标题（`name`）与发行说明
 > （`body`）。删除版本发布时是否一并删除底层 Git tag 取决于 Gitea 配置。
 
+### 仓库 (Repository)
+
+| 工具 | 说明 |
+|------|------|
+| `update_repo` | 编辑仓库元数据——`description`、`name`（重命名）、`website`、`private`、`default_branch`（仅传入的字段会更新） |
+
+> **说明：** `name` 会重命名仓库并改变其 URL，操作前请向用户确认。修改仓库描述时
+> 只需传入 `description`（传空字符串可清空）。
+
 ### 仓库辅助 (Repository Helpers)
 
 | 工具 | 说明 |

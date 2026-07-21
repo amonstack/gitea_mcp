@@ -745,6 +745,53 @@ describe("GiteaClient", () => {
     });
   });
 
+  describe("repository", () => {
+    it("getRepo sends GET to the repo path", async () => {
+      const fetchMock = stubFetch(buildResponse({ id: 9, name: "r", description: "d" }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const result = await client.getRepo("o", "r");
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/o/r");
+      expect(init.method).toBe("GET");
+      expect(result).toEqual({ id: 9, name: "r", description: "d" });
+    });
+
+    it("updateRepo PATCHes only the provided fields", async () => {
+      const fetchMock = stubFetch(buildResponse({ id: 1, description: "new" }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const result = await client.updateRepo({ owner: "o", repo: "r", description: "new" });
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/o/r");
+      expect(init.method).toBe("PATCH");
+      expect(JSON.parse(init.body as string)).toEqual({
+        name: undefined, description: "new", website: undefined,
+        private: undefined, default_branch: undefined,
+      });
+      expect(result).toEqual({ id: 1, description: "new" });
+    });
+
+    it("updateRepo forwards all metadata fields when provided", async () => {
+      const fetchMock = stubFetch(buildResponse({ id: 1 }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.updateRepo({
+        owner: "o", repo: "r", name: "new-name", description: "d",
+        website: "https://x.example", private: true, default_branch: "main",
+      });
+      const { init } = lastCall(fetchMock);
+      expect(JSON.parse(init.body as string)).toEqual({
+        name: "new-name", description: "d", website: "https://x.example",
+        private: true, default_branch: "main",
+      });
+    });
+
+    it("updateRepo URL-encodes the owner/repo segments", async () => {
+      const fetchMock = stubFetch(buildResponse({ id: 1 }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.updateRepo({ owner: "o/r", repo: "r?", description: "d" });
+      expect(lastCall(fetchMock).url).toBe("https://g/api/v1/repos/o%2Fr/r%3F");
+    });
+  });
+
   describe("multi-candidate auth state machine", () => {
     /** Build a candidate with sane defaults. */
     function candidate(overrides: Partial<CandidateCredential>): CandidateCredential {

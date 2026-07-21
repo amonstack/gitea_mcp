@@ -22,6 +22,7 @@ const CLIENT_METHODS = [
   "mergePullRequest", "isPullMerged", "listPullCommits", "listPullFiles",
   "listActionRuns", "getActionRun", "cancelActionRun", "rerunActionRun", "rerunActionRunFailedJobs",
   "listReleases", "getRelease", "getReleaseByTag", "createRelease", "updateRelease", "deleteRelease",
+  "getRepo", "updateRepo",
 ] as const;
 
 type MockClient = Record<string, ReturnType<typeof vi.fn>>;
@@ -49,6 +50,7 @@ const EXPECTED_TOOLS = [
   "rerun_action_run", "rerun_action_run_failed_jobs",
   "list_releases", "get_release", "get_release_by_tag",
   "create_release", "update_release", "delete_release",
+  "update_repo",
   "resolve_repo", "list_my_repos", "gitea_status",
 ];
 
@@ -438,6 +440,18 @@ describe("tool handlers", () => {
     const result = await registeredTools(server as never)["delete_release"].handler({ id: 3 });
     expect(mockClient.deleteRelease).toHaveBeenCalledWith("o", "r", 3);
     expect(result.content[0].text).toBe("Release #3 deleted.");
+  });
+
+  it("update_repo spreads owner/repo into the update params and returns JSON", async () => {
+    const { createServer } = await import("../server.js");
+    const repo = { id: 1, name: "r", description: "new desc" };
+    mockClient.updateRepo.mockResolvedValue(repo);
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["update_repo"].handler({ description: "new desc" });
+    expect(mockClient.updateRepo).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: "o", repo: "r", description: "new desc" }),
+    );
+    expect(JSON.parse(result.content[0].text)).toEqual(repo);
   });
 });
 

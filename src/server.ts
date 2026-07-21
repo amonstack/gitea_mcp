@@ -52,6 +52,7 @@ import {
   CreateReleaseSchema,
   UpdateReleaseSchema,
   DeleteReleaseSchema,
+  UpdateRepoSchema,
 } from "./tools.js";
 import { parseRemotes, selectRemote, resolveGitConfigPath } from "./git-config.js";
 import type { CandidateCredential } from "./credentials.js";
@@ -856,6 +857,24 @@ export async function createServer(
       await client.deleteRelease(owner, repo, input.id);
       return {
         content: [{ type: "text", text: `Release #${input.id} deleted.` }],
+      };
+    },
+  );
+
+  // ── Repository ──
+
+  server.registerTool(
+    "update_repo",
+    {
+      description:
+        "Edit ONE repository's metadata (PATCH: only provided fields change). Provide any of name/description/website/private/default_branch. Use `description` to change the repo description (pass an empty string to clear it). NOTE: `name` RENAMES the repo and changes its URL — confirm with the user first. Returns the updated repository.",
+      inputSchema: UpdateRepoSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const updated = await client.updateRepo({ ...input, owner, repo });
+      return {
+        content: [{ type: "text", text: JSON.stringify(updated, null, 2) }],
       };
     },
   );

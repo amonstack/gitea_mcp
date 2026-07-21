@@ -341,6 +341,16 @@ gitea-mcp
 > maintain the title (`name`) and release notes (`body`). Deleting a release may or
 > may not delete the underlying Git tag depending on the Gitea configuration.
 
+### Repository
+
+| Tool | Description |
+|------|-------------|
+| `update_repo` | Edit a repository's metadata — `description`, `name` (rename), `website`, `private`, `default_branch` (only provided fields change) |
+
+> **Note:** `name` renames the repository and changes its URL; confirm with the
+> user before renaming. To change the repo description, pass only `description`
+> (an empty string clears it).
+
 ### Repository Helpers
 
 | Tool | Description |

@@ -18,6 +18,7 @@ import {
   CancelActionRunSchema,
   RerunActionRunSchema,
   RerunActionRunFailedJobsSchema,
+  UpdateRepoSchema,
 } from "../tools.js";
 
 describe("ListIssuesSchema", () => {
@@ -287,5 +288,41 @@ describe("RerunActionRunFailedJobsSchema", () => {
   it("accepts runId only", () => {
     const result = RerunActionRunFailedJobsSchema.parse({ runId: 5 });
     expect(result.runId).toBe(5);
+  });
+});
+
+describe("UpdateRepoSchema", () => {
+  it("accepts empty input (no fields to update)", () => {
+    const result = UpdateRepoSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts owner/repo and a single metadata field", () => {
+    const result = UpdateRepoSchema.parse({ owner: "o", repo: "r", description: "new desc" });
+    expect(result.owner).toBe("o");
+    expect(result.description).toBe("new desc");
+    expect(result.name).toBeUndefined();
+  });
+
+  it("accepts all metadata fields", () => {
+    const result = UpdateRepoSchema.parse({
+      name: "new-name",
+      description: "d",
+      website: "https://x.example",
+      private: true,
+      default_branch: "main",
+    });
+    expect(result.private).toBe(true);
+    expect(result.default_branch).toBe("main");
+  });
+
+  it("rejects a non-boolean private value", () => {
+    const result = UpdateRepoSchema.safeParse({ private: "yes" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts an empty description (clears it)", () => {
+    const result = UpdateRepoSchema.parse({ description: "" });
+    expect(result.description).toBe("");
   });
 });

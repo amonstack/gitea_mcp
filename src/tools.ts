@@ -372,6 +372,30 @@ export const DeleteReleaseSchema = z.object({
   id: z.number().int().min(1).describe("Release ID (the numeric id from list_releases, NOT the tag name)"),
 });
 
+// ── Repository ──
+
+export const UpdateRepoSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  name: z
+    .string()
+    .optional()
+    .describe("New repository name (RENAME). Renaming changes the repo URL; use with care."),
+  description: z
+    .string()
+    .optional()
+    .describe("New repository description. Pass an empty string to clear the description."),
+  website: z
+    .string()
+    .optional()
+    .describe("New repository homepage/website URL. Pass an empty string to clear."),
+  private: z.boolean().optional().describe("New visibility: true = private, false = public"),
+  default_branch: z
+    .string()
+    .optional()
+    .describe("New default branch name (the branch must already exist in the repo)"),
+});
+
 // ── Actions ──
 
 export const ListActionRunsSchema = z.object({

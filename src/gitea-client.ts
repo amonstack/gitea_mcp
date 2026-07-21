@@ -306,6 +306,18 @@ export interface MergePullRequestParams {
   SHA?: string;
 }
 
+// ── Repository ──
+
+export interface UpdateRepoParams {
+  owner: string;
+  repo: string;
+  name?: string;
+  description?: string;
+  website?: string;
+  private?: boolean;
+  default_branch?: string;
+}
+
 // ── Actions ──
 
 export interface ActionWorkflowRun {
@@ -1020,5 +1032,23 @@ export class GiteaClient {
   async deleteRelease(owner: string, repo: string, id: number): Promise<void> {
     const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases/${id}`;
     return this.request<void>("DELETE", path);
+  }
+
+  // ── Repository ──
+
+  async getRepo(owner: string, repo: string): Promise<Repo> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+    return this.request<Repo>("GET", path);
+  }
+
+  async updateRepo(params: UpdateRepoParams): Promise<Repo> {
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}`;
+    return this.request<Repo>("PATCH", path, {
+      name: params.name,
+      description: params.description,
+      website: params.website,
+      private: params.private,
+      default_branch: params.default_branch,
+    });
   }
 }
