@@ -441,3 +441,48 @@ export const RerunActionRunFailedJobsSchema = z.object({
   repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
   runId: z.number().int().min(1).describe("Action workflow run ID"),
 });
+
+// ── Wiki ──
+
+export const ListWikiPagesSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  page: z.number().int().min(1).optional().describe("Page number"),
+  limit: z.number().int().min(1).max(100).optional().describe("Wiki pages per page"),
+});
+
+export const GetWikiPageSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  pageName: z.string().min(1).describe("Wiki page name/title as it appears in the wiki URL (e.g. 'Home', 'Getting-Started')"),
+});
+
+export const CreateWikiPageSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  title: z.string().min(1).describe("Wiki page title (e.g. 'Getting-Started'; use 'Home' for the landing page, '_Sidebar' / '_Footer' for layout pages)"),
+  content: z.string().describe("Page content in Markdown (plain text — base64 encoding is handled for you)"),
+  message: z.string().optional().describe("Optional commit message summarizing the change"),
+});
+
+export const UpdateWikiPageSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  pageName: z.string().min(1).describe("Wiki page name/title as it appears in the wiki URL (e.g. 'Home', 'Getting-Started')"),
+  title: z.string().min(1).optional().describe("New page title — RENAMES the page (omit to keep the current title)"),
+  content: z.string().optional().describe("New page content in Markdown (plain text — base64 encoding is handled for you)"),
+  message: z.string().optional().describe("Optional commit message summarizing the change"),
+});
+
+export const DeleteWikiPageSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  pageName: z.string().min(1).describe("Wiki page name/title as it appears in the wiki URL (e.g. 'Home', 'Getting-Started')"),
+});
+
+export const ListWikiRevisionsSchema = z.object({
+  owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
+  repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),
+  pageName: z.string().min(1).describe("Wiki page name/title as it appears in the wiki URL (e.g. 'Home', 'Getting-Started')"),
+  page: z.number().int().min(1).optional().describe("Page number"),
+});

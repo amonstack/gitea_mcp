@@ -1051,4 +1051,122 @@ describe("GiteaClient", () => {
       expect((caught as GiteaApiError).status).toBe(401);
     });
   });
+
+  describe("wiki", () => {
+    const wikiPageResponse = {
+      title: "Home",
+      content_base64: Buffer.from("# Welcome\n", "utf-8").toString("base64"),
+      footer: "f",
+      sidebar: "s",
+      html_url: "https://g/o/r/wiki/Home",
+      sub_url: "/Home",
+      commit_count: 3,
+      last_commit: { sha: "abc", message: "edit" },
+    };
+
+    it("listWikiPages builds the paginated list URL", async () => {
+      const fetchMock = stubFetch(buildResponse([]));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.listWikiPages({ owner: "own", repo: "rp", page: 2, limit: 50 });
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/own/rp/wiki/pages?page=2&limit=50");
+      expect(init.method).toBe("GET");
+    });
+
+    it("listWikiPages omits the query without pagination", async () => {
+      const fetchMock = stubFetch(buildResponse([]));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.listWikiPages({ owner: "own", repo: "rp" });
+      expect(lastCall(fetchMock).url).toBe("https://g/api/v1/repos/own/rp/wiki/pages");
+    });
+
+    it("getWikiPage decodes content_base64 into plain content", async () => {
+      const fetchMock = stubFetch(buildResponse(wikiPageResponse));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const page = await client.getWikiPage("o", "r", "Home");
+      expect(lastCall(fetchMock).url).toBe("https://g/api/v1/repos/o/r/wiki/page/Home");
+      expect(page.content).toBe("# Welcome\n");
+      expect(page.title).toBe("Home");
+      expect(page.footer).toBe("f");
+      expect(page.sidebar).toBe("s");
+      expect(page.commit_count).toBe(3);
+      expect(page).not.toHaveProperty("content_base64");
+    });
+
+    it("getWikiPage encodes the pageName path segment", async () => {
+      const fetchMock = stubFetch(buildResponse(wikiPageResponse));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.getWikiPage("o", "r", "Café Guide");
+      expect(lastCall(fetchMock).url).toBe(
+        `https://g/api/v1/repos/o/r/wiki/page/${encodeURIComponent("Café Guide")}`,
+      );
+    });
+
+    it("getWikiPage tolerates a missing content_base64", async () => {
+      stubFetch(buildResponse({ ...wikiPageResponse, content_base64: undefined }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const page = await client.getWikiPage("o", "r", "Home");
+      expect(page.content).toBe("");
+    });
+
+    it("createWikiPage posts base64-encoded content and decodes the response", async () => {
+      const fetchMock = stubFetch(buildResponse(wikiPageResponse, 201, "Created"));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const page = await client.createWikiPage({
+        owner: "o",
+        repo: "r",
+        title: "Home",
+        content: "# Welcome\n",
+        message: "add home",
+      });
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/o/r/wiki/new");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body as string)).toEqual({
+        title: "Home",
+        content_base64: Buffer.from("# Welcome\n", "utf-8").toString("base64"),
+        message: "add home",
+      });
+      expect(page.content).toBe("# Welcome\n");
+    });
+
+    it("updateWikiPage sends only provided fields and omits content_base64 when content is absent", async () => {
+      const fetchMock = stubFetch(buildResponse(wikiPageResponse));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.updateWikiPage({ owner: "o", repo: "r", pageName: "Old", title: "New" });
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/o/r/wiki/page/Old");
+      expect(init.method).toBe("PATCH");
+      expect(JSON.parse(init.body as string)).toEqual({ title: "New" });
+    });
+
+    it("updateWikiPage base64-encodes provided content", async () => {
+      const fetchMock = stubFetch(buildResponse(wikiPageResponse));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.updateWikiPage({ owner: "o", repo: "r", pageName: "Home", content: "new body" });
+      expect(JSON.parse(lastCall(fetchMock).init.body as string)).toEqual({
+        content_base64: Buffer.from("new body", "utf-8").toString("base64"),
+      });
+    });
+
+    it("deleteWikiPage issues a DELETE and resolves undefined on 204", async () => {
+      const fetchMock = stubFetch(buildResponse(undefined, 204, "No Content"));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const result = await client.deleteWikiPage("o", "r", "Home");
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/o/r/wiki/page/Home");
+      expect(init.method).toBe("DELETE");
+      expect(result).toBeUndefined();
+    });
+
+    it("listWikiRevisions builds the revisions URL with pagination", async () => {
+      const fetchMock = stubFetch(buildResponse({ commits: [], count: 0 }));
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const revisions = await client.listWikiRevisions("o", "r", "Home", 2);
+      const { url, init } = lastCall(fetchMock);
+      expect(url).toBe("https://g/api/v1/repos/o/r/wiki/revisions/Home?page=2");
+      expect(init.method).toBe("GET");
+      expect(revisions).toEqual({ commits: [], count: 0 });
+    });
+  });
 });

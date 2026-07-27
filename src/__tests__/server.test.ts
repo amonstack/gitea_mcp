@@ -23,6 +23,7 @@ const CLIENT_METHODS = [
   "listActionRuns", "getActionRun", "cancelActionRun", "rerunActionRun", "rerunActionRunFailedJobs",
   "listReleases", "getRelease", "getReleaseByTag", "createRelease", "updateRelease", "deleteRelease",
   "getRepo", "updateRepo",
+  "listWikiPages", "getWikiPage", "createWikiPage", "updateWikiPage", "deleteWikiPage", "listWikiRevisions",
 ] as const;
 
 type MockClient = Record<string, ReturnType<typeof vi.fn>>;
@@ -51,6 +52,8 @@ const EXPECTED_TOOLS = [
   "list_releases", "get_release", "get_release_by_tag",
   "create_release", "update_release", "delete_release",
   "update_repo",
+  "list_wiki_pages", "get_wiki_page", "create_wiki_page",
+  "update_wiki_page", "delete_wiki_page", "list_wiki_revisions",
   "resolve_repo", "list_my_repos", "gitea_status",
 ];
 
@@ -452,6 +455,71 @@ describe("tool handlers", () => {
       expect.objectContaining({ owner: "o", repo: "r", description: "new desc" }),
     );
     expect(JSON.parse(result.content[0].text)).toEqual(repo);
+  });
+
+  it("list_wiki_pages spreads owner/repo and returns JSON of the client result", async () => {
+    const { createServer } = await import("../server.js");
+    const pages = [{ title: "Home", html_url: "https://g/o/r/wiki/Home" }];
+    mockClient.listWikiPages.mockResolvedValue(pages);
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["list_wiki_pages"].handler({ page: 1, limit: 50 });
+    expect(mockClient.listWikiPages).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: "o", repo: "r", page: 1, limit: 50 }),
+    );
+    expect(JSON.parse(result.content[0].text)).toEqual(pages);
+  });
+
+  it("get_wiki_page forwards owner/repo/pageName and returns decoded JSON", async () => {
+    const { createServer } = await import("../server.js");
+    const page = { title: "Home", content: "# Welcome" };
+    mockClient.getWikiPage.mockResolvedValue(page);
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["get_wiki_page"].handler({ pageName: "Home" });
+    expect(mockClient.getWikiPage).toHaveBeenCalledWith("o", "r", "Home");
+    expect(JSON.parse(result.content[0].text)).toEqual(page);
+  });
+
+  it("create_wiki_page spreads owner/repo into the create params", async () => {
+    const { createServer } = await import("../server.js");
+    const page = { title: "Getting-Started", content: "# Start" };
+    mockClient.createWikiPage.mockResolvedValue(page);
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["create_wiki_page"].handler({
+      title: "Getting-Started", content: "# Start", message: "add getting started",
+    });
+    expect(mockClient.createWikiPage).toHaveBeenCalledWith({
+      owner: "o", repo: "r", title: "Getting-Started", content: "# Start", message: "add getting started",
+    });
+    expect(JSON.parse(result.content[0].text)).toEqual(page);
+  });
+
+  it("update_wiki_page spreads owner/repo into the update params", async () => {
+    const { createServer } = await import("../server.js");
+    mockClient.updateWikiPage.mockResolvedValue({ title: "Home", content: "x" });
+    const server = await createServer("https://g", undefined, "o", "r");
+    await registeredTools(server as never)["update_wiki_page"].handler({ pageName: "Home", content: "x" });
+    expect(mockClient.updateWikiPage).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: "o", repo: "r", pageName: "Home", content: "x" }),
+    );
+  });
+
+  it("delete_wiki_page deletes and returns a confirmation string", async () => {
+    const { createServer } = await import("../server.js");
+    mockClient.deleteWikiPage.mockResolvedValue(undefined);
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["delete_wiki_page"].handler({ pageName: "Home" });
+    expect(mockClient.deleteWikiPage).toHaveBeenCalledWith("o", "r", "Home");
+    expect(result.content[0].text).toBe("Wiki page 'Home' deleted.");
+  });
+
+  it("list_wiki_revisions forwards owner/repo/pageName/page and returns JSON", async () => {
+    const { createServer } = await import("../server.js");
+    const revisions = { commits: [{ sha: "abc", message: "edit" }], count: 1 };
+    mockClient.listWikiRevisions.mockResolvedValue(revisions);
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["list_wiki_revisions"].handler({ pageName: "Home", page: 2 });
+    expect(mockClient.listWikiRevisions).toHaveBeenCalledWith("o", "r", "Home", 2);
+    expect(JSON.parse(result.content[0].text)).toEqual(revisions);
   });
 });
 

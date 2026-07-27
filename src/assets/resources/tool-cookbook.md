@@ -60,6 +60,22 @@ Quick recipes for common goals. Always resolve owner/repo first (explicit args,
   `mergeable: true`; get user approval; then `merge_pull_request({ index, Do })`.
   `Do`: `merge` / `squash` / `rebase` / `rebase-merge`.
 
+## Wiki
+- See what exists → `list_wiki_pages({})` (metadata only; page/limit as usual).
+- Read a page → `get_wiki_page({ pageName })` — `content` comes back as plain
+  Markdown (base64 decoded). `pageName` is the URL title, e.g. `Home`,
+  `Getting-Started`; `Home` is the landing page, `_Sidebar`/`_Footer` the layout.
+- Write a new page → `create_wiki_page({ title, content, message? })`. Content is
+  plain Markdown (never base64). Fails if the title exists → switch to update.
+  Format per the **gitea-write-wiki** skill's `format-guide.md`.
+- Edit a page → `update_wiki_page({ pageName, content?, message? })` (PATCH; omit
+  `content` to keep it). Passing `title` RENAMES the page and breaks old links —
+  fix the links in the same pass. Read first; there is no optimistic locking.
+- New page not reachable? Add it to `_Sidebar` via `update_wiki_page`.
+- Page history / who changed what → `list_wiki_revisions({ pageName })`.
+- Delete a page → `delete_wiki_page({ pageName })` — recoverable only from the
+  wiki git clone (`<repo>.wiki.git`); confirm first.
+
 ## Pagination pattern (all list tools)
 ```
 page = 1

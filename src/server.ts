@@ -53,6 +53,12 @@ import {
   UpdateReleaseSchema,
   DeleteReleaseSchema,
   UpdateRepoSchema,
+  ListWikiPagesSchema,
+  GetWikiPageSchema,
+  CreateWikiPageSchema,
+  UpdateWikiPageSchema,
+  DeleteWikiPageSchema,
+  ListWikiRevisionsSchema,
 } from "./tools.js";
 import { parseRemotes, selectRemote, resolveGitConfigPath } from "./git-config.js";
 import type { CandidateCredential } from "./credentials.js";
@@ -875,6 +881,104 @@ export async function createServer(
       const updated = await client.updateRepo({ ...input, owner, repo });
       return {
         content: [{ type: "text", text: JSON.stringify(updated, null, 2) }],
+      };
+    },
+  );
+
+  // ── Wiki ──
+
+  server.registerTool(
+    "list_wiki_pages",
+    {
+      description:
+        "List all wiki pages in one Gitea repository (metadata only: title, html_url, sub_url, last_commit — no page content). Paginated: page is 1-based, limit <= 100; keep paging until a page returns fewer than `limit`. Requires the repo's wiki feature to be enabled (404 otherwise). Example: list_wiki_pages({ page: 1, limit: 50 })",
+      inputSchema: ListWikiPagesSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const pages = await client.listWikiPages({ ...input, owner, repo });
+      return {
+        content: [{ type: "text", text: JSON.stringify(pages, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_wiki_page",
+    {
+      description:
+        "Fetch one wiki page by its `pageName` — the page title as it appears in the wiki URL (e.g. 'Home', 'Getting-Started'). Returns the full page with `content` DECODED to plain Markdown (the API's base64 is handled for you), plus `footer`, `sidebar`, `commit_count`, and `last_commit`. Use list_wiki_pages first if you are unsure of the exact page name.",
+      inputSchema: GetWikiPageSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const page = await client.getWikiPage(owner, repo, input.pageName);
+      return {
+        content: [{ type: "text", text: JSON.stringify(page, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "create_wiki_page",
+    {
+      description:
+        "Create a wiki page. `title` is required ('Home' is the wiki landing page; '_Sidebar' / '_Footer' are the layout pages). `content` is plain Markdown — base64 encoding is handled for you. `message` is an optional commit message. RISK: fails if a page with that title already exists — call list_wiki_pages or get_wiki_page first and use update_wiki_page for existing pages. Returns the created page with decoded content.",
+      inputSchema: CreateWikiPageSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const page = await client.createWikiPage({ ...input, owner, repo });
+      return {
+        content: [{ type: "text", text: JSON.stringify(page, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "update_wiki_page",
+    {
+      description:
+        "Edit an existing wiki page by `pageName` (PATCH: only provided fields change). `content` is plain Markdown (base64 handled for you); omit it to keep the current content. RISK: passing `title` RENAMES the page, which breaks existing links to the old name. Read the page with get_wiki_page first if it may have changed since your last read. Returns the updated page with decoded content.",
+      inputSchema: UpdateWikiPageSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const page = await client.updateWikiPage({ ...input, owner, repo });
+      return {
+        content: [{ type: "text", text: JSON.stringify(page, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "delete_wiki_page",
+    {
+      description:
+        "PERMANENTLY delete a wiki page by `pageName`. The page is removed from the wiki; its history survives only in the wiki git repository (clone <repo>.wiki.git to recover), so treat this as IRREVERSIBLE from the API. Confirm the pageName with the user first; prefer update_wiki_page to blank or redirect a page instead of deleting it.",
+      inputSchema: DeleteWikiPageSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      await client.deleteWikiPage(owner, repo, input.pageName);
+      return {
+        content: [{ type: "text", text: `Wiki page '${input.pageName}' deleted.` }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "list_wiki_revisions",
+    {
+      description:
+        "List the revision history of one wiki page by `pageName` (newest first). Returns { commits: [{ sha, message, author, commiter }], count }. Paginated: page is 1-based; keep paging while a page returns a full page of commits. Use to audit who changed a page and when, before reverting or summarizing changes.",
+      inputSchema: ListWikiRevisionsSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const revisions = await client.listWikiRevisions(owner, repo, input.pageName, input.page);
+      return {
+        content: [{ type: "text", text: JSON.stringify(revisions, null, 2) }],
       };
     },
   );

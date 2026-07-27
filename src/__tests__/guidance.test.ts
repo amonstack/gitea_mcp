@@ -18,6 +18,7 @@ const CLIENT_METHODS = [
   "listPullRequests", "getPullRequest", "createPullRequest", "updatePullRequest",
   "mergePullRequest", "isPullMerged", "listPullCommits", "listPullFiles",
   "listActionRuns", "getActionRun", "cancelActionRun", "rerunActionRun", "rerunActionRunFailedJobs",
+  "listWikiPages", "getWikiPage", "createWikiPage", "updateWikiPage", "deleteWikiPage", "listWikiRevisions",
 ] as const;
 
 type MockClient = Record<string, ReturnType<typeof vi.fn>>;

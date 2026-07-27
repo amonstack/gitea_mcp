@@ -335,6 +335,22 @@ gitea-mcp
 > **说明：** `name` 会重命名仓库并改变其 URL，操作前请向用户确认。修改仓库描述时
 > 只需传入 `description`（传空字符串可清空）。
 
+### Wiki
+
+| 工具 | 说明 |
+|------|------|
+| `list_wiki_pages` | 列出仓库全部 wiki 页面（仅元数据，page/limit 分页） |
+| `get_wiki_page` | 按 `pageName` 获取一个 wiki 页面——`content` 以纯 Markdown 返回（已解码 base64） |
+| `create_wiki_page` | 创建 wiki 页面（`title`、纯 Markdown `content`、可选 `message`） |
+| `update_wiki_page` | 按 `pageName` 编辑 wiki 页面；传 `title` 可重命名（仅传入的字段会更新） |
+| `delete_wiki_page` | 按 `pageName` 删除 wiki 页面——只能从 wiki git 克隆中恢复 |
+| `list_wiki_revisions` | 按 `pageName` 列出一个 wiki 页面的修订历史 |
+
+> **说明：** `pageName` 是 wiki URL 中显示的页面标题（如 `Home`、
+> `Getting-Started`）。`Home` 是落地页，`_Sidebar` 与 `_Footer` 是布局页。页面
+> 内容始终是纯 Markdown——工具会自动处理 API 的 base64 编解码。需要仓库已开启
+> wiki 功能（否则返回 404）。
+
 ### 仓库辅助 (Repository Helpers)
 
 | 工具 | 说明 |
@@ -382,6 +398,7 @@ gitea-mcp
 | `gitea-find-actions` | 发现 / 读取 Actions 工作流运行 |
 | `gitea-cancel-action` | 取消进行中的运行（先检查状态并经用户确认） |
 | `gitea-rerun-action` | 重试已完成的运行——全部或仅失败的 job |
+| `gitea-write-wiki` | 按内置开源 wiki 格式规范编写 / 编辑 wiki 页面 |
 
 每个技能都是面向 AI 的简短动作流程（目的、何时用、何时不用、规则、先检查什么）。
 创建、评论、里程碑三类技能还内嵌**正文模板**（bug / 新功能 / 性能 issue、评论、

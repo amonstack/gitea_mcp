@@ -318,6 +318,79 @@ export interface UpdateRepoParams {
   default_branch?: string;
 }
 
+// ── Wiki ──
+
+export interface WikiCommit {
+  sha: string;
+  message: string;
+  author?: { name: string; email: string; date?: string };
+  commiter?: { name: string; email: string; date?: string };
+}
+
+export interface WikiPageMeta {
+  title: string;
+  html_url: string;
+  sub_url?: string;
+  last_commit?: WikiCommit;
+}
+
+/**
+ * Decoded wiki page as returned to MCP callers. `content` is the plain
+ * Markdown text (decoded from the API's `content_base64`) so clients never
+ * have to handle base64 themselves.
+ */
+export interface WikiPage {
+  title: string;
+  content: string;
+  footer?: string;
+  sidebar?: string;
+  html_url: string;
+  sub_url?: string;
+  commit_count: number;
+  last_commit?: WikiCommit;
+}
+
+/** Raw wiki page shape returned by the Gitea API (content is base64). */
+interface WikiPageResponse {
+  title: string;
+  content_base64?: string;
+  footer?: string;
+  sidebar?: string;
+  html_url: string;
+  sub_url?: string;
+  commit_count: number;
+  last_commit?: WikiCommit;
+}
+
+export interface WikiRevisionList {
+  commits: WikiCommit[];
+  count: number;
+}
+
+export interface ListWikiPagesParams {
+  owner: string;
+  repo: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateWikiPageParams {
+  owner: string;
+  repo: string;
+  title: string;
+  content: string;
+  message?: string;
+}
+
+export interface UpdateWikiPageParams {
+  owner: string;
+  repo: string;
+  pageName: string;
+  title?: string;
+  content?: string;
+  message?: string;
+}
+
 // ── Actions ──
 
 export interface ActionWorkflowRun {
@@ -1067,5 +1140,79 @@ export class GiteaClient {
       private: params.private,
       default_branch: params.default_branch,
     });
+  }
+
+  // ── Wiki ──
+
+  /** Decode the API's base64 page payload into the plain-text WikiPage shape. */
+  private static decodeWikiPage(raw: WikiPageResponse): WikiPage {
+    return {
+      title: raw.title,
+      content: Buffer.from(raw.content_base64 ?? "", "base64").toString("utf-8"),
+      footer: raw.footer,
+      sidebar: raw.sidebar,
+      html_url: raw.html_url,
+      sub_url: raw.sub_url,
+      commit_count: raw.commit_count,
+      last_commit: raw.last_commit,
+    };
+  }
+
+  async listWikiPages(params: ListWikiPagesParams): Promise<WikiPageMeta[]> {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.set("page", String(params.page));
+    if (params.limit) searchParams.set("limit", String(params.limit));
+
+    const query = searchParams.toString();
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/wiki/pages${query ? `?${query}` : ""}`;
+    return this.request<WikiPageMeta[]>("GET", path);
+  }
+
+  async getWikiPage(owner: string, repo: string, pageName: string): Promise<WikiPage> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/wiki/page/${encodeURIComponent(pageName)}`;
+    const raw = await this.request<WikiPageResponse>("GET", path);
+    return GiteaClient.decodeWikiPage(raw);
+  }
+
+  async createWikiPage(params: CreateWikiPageParams): Promise<WikiPage> {
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/wiki/new`;
+    const raw = await this.request<WikiPageResponse>("POST", path, {
+      title: params.title,
+      content_base64: Buffer.from(params.content, "utf-8").toString("base64"),
+      message: params.message,
+    });
+    return GiteaClient.decodeWikiPage(raw);
+  }
+
+  async updateWikiPage(params: UpdateWikiPageParams): Promise<WikiPage> {
+    const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/wiki/page/${encodeURIComponent(params.pageName)}`;
+    const raw = await this.request<WikiPageResponse>("PATCH", path, {
+      title: params.title,
+      content_base64:
+        params.content === undefined
+          ? undefined
+          : Buffer.from(params.content, "utf-8").toString("base64"),
+      message: params.message,
+    });
+    return GiteaClient.decodeWikiPage(raw);
+  }
+
+  async deleteWikiPage(owner: string, repo: string, pageName: string): Promise<void> {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/wiki/page/${encodeURIComponent(pageName)}`;
+    return this.request<void>("DELETE", path);
+  }
+
+  async listWikiRevisions(
+    owner: string,
+    repo: string,
+    pageName: string,
+    page?: number,
+  ): Promise<WikiRevisionList> {
+    const searchParams = new URLSearchParams();
+    if (page) searchParams.set("page", String(page));
+
+    const query = searchParams.toString();
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/wiki/revisions/${encodeURIComponent(pageName)}${query ? `?${query}` : ""}`;
+    return this.request<WikiRevisionList>("GET", path);
   }
 }

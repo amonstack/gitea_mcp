@@ -285,7 +285,11 @@ follows the same pattern for workflow-run maintenance: skills
 (`gitea-find-actions`, `gitea-cancel-action`, `gitea-rerun-action`) and a prompt
 (`triage_action_runs`) cover the list/get/cancel/rerun tool group, with cancel and
 rerun skills enforcing a pre-check (status verification) + user-confirmation flow
-mirroring the merge-pull safety pattern.
+mirroring the merge-pull safety pattern. The Wiki tool group
+(`list/get/create/update/delete_wiki_page`, `list_wiki_revisions`) pairs with the
+`gitea-write-wiki` skill, which bundles `format-guide.md` — the OSS wiki format
+spec (page model, naming, Markdown style, templates) — and is referenced from the
+handshake instructions and the tool cookbook.
 
 ## 6. Environment Contract
 

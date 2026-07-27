@@ -79,6 +79,20 @@ operations (create/update/merge, commits, files, merge-check) use the
   `mergeable: true` via `get_pull_request`, and get explicit user approval before
   choosing a `Do` strategy (merge / squash / rebase / rebase-merge).
 
+## Wiki pages
+
+The wiki tools read and write repository wiki pages. `pageName` is the page title
+as it appears in the wiki URL (`Home`, `Getting-Started`) — `Home` is the landing
+page, `_Sidebar` / `_Footer` the layout pages. Page content is ALWAYS plain
+Markdown: `get_wiki_page` returns it decoded, `create_wiki_page` /
+`update_wiki_page` accept it raw (the API's base64 encoding is handled
+internally — never send base64 yourself). `create_wiki_page` fails if the title
+exists (use `update_wiki_page` instead); `update_wiki_page` with `title` renames
+the page and breaks existing links. `delete_wiki_page` is recoverable only from
+the wiki git clone — confirm first. When writing or restructuring pages, follow
+the **gitea-write-wiki** skill's format guide (page model, naming, Markdown
+style, templates).
+
 ## Search vs list
 
 - `list_issues` — one repo, paginated, filterable by state/labels.

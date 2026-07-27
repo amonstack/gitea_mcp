@@ -351,6 +351,23 @@ gitea-mcp
 > user before renaming. To change the repo description, pass only `description`
 > (an empty string clears it).
 
+### Wiki
+
+| Tool | Description |
+|------|-------------|
+| `list_wiki_pages` | List all wiki pages in a repo (metadata only, page/limit) |
+| `get_wiki_page` | Get one wiki page by `pageName` — `content` returned as plain Markdown (base64 decoded) |
+| `create_wiki_page` | Create a wiki page (`title`, plain-Markdown `content`, optional `message`) |
+| `update_wiki_page` | Edit a wiki page by `pageName`; pass `title` to rename (only provided fields change) |
+| `delete_wiki_page` | Delete a wiki page by `pageName` — recoverable only from the wiki git clone |
+| `list_wiki_revisions` | List the revision history of one wiki page by `pageName` |
+
+> **Note:** `pageName` is the page title as it appears in the wiki URL (e.g.
+> `Home`, `Getting-Started`). `Home` is the landing page; `_Sidebar` and
+> `_Footer` are the layout pages. Page content is always plain Markdown — the
+> tools handle the API's base64 encoding for you. Requires the repo's wiki
+> feature to be enabled (404 otherwise).
+
 ### Repository Helpers
 
 | Tool | Description |
@@ -401,6 +418,7 @@ say, delete instructions while creating). Install them with the
 | `gitea-find-actions` | discovering / reading Actions workflow runs |
 | `gitea-cancel-action` | cancelling an active run (after status check + user confirmation) |
 | `gitea-rerun-action` | rerunning a completed run — full or failed jobs only |
+| `gitea-write-wiki` | writing / editing wiki pages per the bundled OSS wiki format spec |
 
 Each skill is a short, AI-facing action flow (purpose, when to use, when not to,
 rules, and what to check first). The create, comment, and milestone skills also

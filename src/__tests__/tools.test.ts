@@ -19,6 +19,12 @@ import {
   RerunActionRunSchema,
   RerunActionRunFailedJobsSchema,
   UpdateRepoSchema,
+  ListWikiPagesSchema,
+  GetWikiPageSchema,
+  CreateWikiPageSchema,
+  UpdateWikiPageSchema,
+  DeleteWikiPageSchema,
+  ListWikiRevisionsSchema,
 } from "../tools.js";
 
 describe("ListIssuesSchema", () => {
@@ -324,5 +330,104 @@ describe("UpdateRepoSchema", () => {
   it("accepts an empty description (clears it)", () => {
     const result = UpdateRepoSchema.parse({ description: "" });
     expect(result.description).toBe("");
+  });
+});
+
+// ── Wiki ──
+
+describe("ListWikiPagesSchema", () => {
+  it("accepts empty input", () => {
+    const result = ListWikiPagesSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts pagination", () => {
+    const result = ListWikiPagesSchema.parse({ owner: "o", repo: "r", page: 2, limit: 50 });
+    expect(result.page).toBe(2);
+    expect(result.limit).toBe(50);
+  });
+
+  it("rejects limit above 100", () => {
+    const result = ListWikiPagesSchema.safeParse({ limit: 101 });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("GetWikiPageSchema", () => {
+  it("requires pageName", () => {
+    const result = GetWikiPageSchema.safeParse({ owner: "a", repo: "b" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty pageName", () => {
+    const result = GetWikiPageSchema.safeParse({ pageName: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts pageName only", () => {
+    const result = GetWikiPageSchema.parse({ pageName: "Getting-Started" });
+    expect(result.pageName).toBe("Getting-Started");
+  });
+});
+
+describe("CreateWikiPageSchema", () => {
+  it("requires title and content", () => {
+    expect(CreateWikiPageSchema.safeParse({ title: "Home" }).success).toBe(false);
+    expect(CreateWikiPageSchema.safeParse({ content: "# Hi" }).success).toBe(false);
+  });
+
+  it("accepts minimal valid input", () => {
+    const result = CreateWikiPageSchema.parse({ title: "Home", content: "# Welcome" });
+    expect(result.title).toBe("Home");
+    expect(result.message).toBeUndefined();
+  });
+
+  it("accepts an optional commit message", () => {
+    const result = CreateWikiPageSchema.parse({ title: "Home", content: "x", message: "add home" });
+    expect(result.message).toBe("add home");
+  });
+});
+
+describe("UpdateWikiPageSchema", () => {
+  it("requires pageName", () => {
+    const result = UpdateWikiPageSchema.safeParse({ content: "x" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts pageName only (no-op update)", () => {
+    const result = UpdateWikiPageSchema.parse({ pageName: "Home" });
+    expect(result.title).toBeUndefined();
+    expect(result.content).toBeUndefined();
+  });
+
+  it("accepts a rename without content", () => {
+    const result = UpdateWikiPageSchema.parse({ pageName: "Old-Name", title: "New-Name" });
+    expect(result.title).toBe("New-Name");
+    expect(result.content).toBeUndefined();
+  });
+});
+
+describe("DeleteWikiPageSchema", () => {
+  it("requires pageName", () => {
+    const result = DeleteWikiPageSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts pageName with owner/repo", () => {
+    const result = DeleteWikiPageSchema.parse({ owner: "o", repo: "r", pageName: "Home" });
+    expect(result.pageName).toBe("Home");
+  });
+});
+
+describe("ListWikiRevisionsSchema", () => {
+  it("requires pageName", () => {
+    const result = ListWikiRevisionsSchema.safeParse({ page: 1 });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts pageName and optional page", () => {
+    const result = ListWikiRevisionsSchema.parse({ pageName: "Home", page: 3 });
+    expect(result.pageName).toBe("Home");
+    expect(result.page).toBe(3);
   });
 });
