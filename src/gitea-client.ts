@@ -343,6 +343,31 @@ export interface MergePullRequestParams {
   SHA?: string;
 }
 
+// ── Projects (placeholder — Gitea has no projects REST API yet) ──
+
+/**
+ * Repository project board. No live shape exists yet — the fields here
+ * anticipate the upstream API (go-gitea/gitea#36824) so that wiring real HTTP
+ * calls later is a mechanical change inside `listProjects` / `getProject`.
+ */
+export interface Project {
+  id: number;
+  title: string;
+  description?: string;
+  state: string;
+}
+
+export interface ListProjectsParams {
+  owner: string;
+  repo: string;
+}
+
+export interface GetProjectParams {
+  owner: string;
+  repo: string;
+  id: number;
+}
+
 // ── Repository ──
 
 export interface UpdateRepoParams {
@@ -1354,5 +1379,34 @@ export class GiteaClient {
     const query = searchParams.toString();
     const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/wiki/revisions/${encodeURIComponent(pageName)}${query ? `?${query}` : ""}`;
     return this.request<WikiRevisionList>("GET", path);
+  }
+
+  // ── Projects (placeholder — no HTTP) ──
+
+  /**
+   * Always returns an empty list. Gitea does not yet ship a REST API for
+   * repository project boards (go-gitea/gitea#36824), so rather than calling a
+   * nonexistent endpoint we return `[]` locally. The day the upstream API
+   * lands, wiring the real call is a one-line change inside this method — no
+   * contract churn for callers.
+   */
+  async listProjects(_params: ListProjectsParams): Promise<Project[]> {
+    return [];
+  }
+
+  /**
+   * Always reports "not found" for the requested project. Gitea does not yet
+   * ship a REST API for repository project boards (go-gitea/gitea#36824), so
+   * the project cannot exist from the API's perspective. The thrown error
+   * carries HTTP 404 semantics — the same way `getIssue` surfaces a missing
+   * issue — so MCP clients see a consistent not-found signal. When the upstream
+   * API lands, replace the body with a real `this.request` call.
+   */
+  async getProject(params: GetProjectParams): Promise<Project> {
+    throw new GiteaApiError(
+      404,
+      "Not Found",
+      `project ${params.id} not found in ${params.owner}/${params.repo} — Gitea has no projects REST API yet (go-gitea/gitea#36824)`,
+    );
   }
 }

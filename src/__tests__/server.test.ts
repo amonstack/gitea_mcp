@@ -26,6 +26,7 @@ const CLIENT_METHODS = [
   "listReleases", "getRelease", "getReleaseByTag", "createRelease", "updateRelease", "deleteRelease",
   "getRepo", "updateRepo",
   "listWikiPages", "getWikiPage", "createWikiPage", "updateWikiPage", "deleteWikiPage", "listWikiRevisions",
+  "listProjects", "getProject",
 ] as const;
 
 type MockClient = Record<string, ReturnType<typeof vi.fn>>;
@@ -58,6 +59,7 @@ const EXPECTED_TOOLS = [
   "update_repo",
   "list_wiki_pages", "get_wiki_page", "create_wiki_page",
   "update_wiki_page", "delete_wiki_page", "list_wiki_revisions",
+  "list_projects", "get_project",
   "resolve_repo", "list_my_repos", "gitea_status",
 ];
 
@@ -616,6 +618,25 @@ describe("tool handlers", () => {
       owner: "o", repo: "r", index: 7, depIndex: 9, depOwner: "other", depRepo: "proj",
     });
     expect(JSON.parse(result.content[0].text)).toEqual(issue);
+  });
+
+  it("list_projects returns an empty list", async () => {
+    const { createServer } = await import("../server.js");
+    mockClient.listProjects.mockResolvedValue([]);
+    const server = await createServer("https://g", undefined, "o", "r");
+    const result = await registeredTools(server as never)["list_projects"].handler({});
+    expect(mockClient.listProjects).toHaveBeenCalledWith({ owner: "o", repo: "r" });
+    expect(JSON.parse(result.content[0].text)).toEqual([]);
+  });
+
+  it("get_project surfaces not-found via the client", async () => {
+    const { createServer } = await import("../server.js");
+    mockClient.getProject.mockRejectedValue(new Error("Gitea API error (404): project not found"));
+    const server = await createServer("https://g", undefined, "o", "r");
+    await expect(
+      registeredTools(server as never)["get_project"].handler({ id: 42 }),
+    ).rejects.toThrow();
+    expect(mockClient.getProject).toHaveBeenCalledWith({ owner: "o", repo: "r", id: 42 });
   });
 });
 

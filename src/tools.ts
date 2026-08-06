@@ -240,6 +240,35 @@ export const DeleteMilestoneSchema = z.object({
   id: z.number().int().min(1).describe("Milestone ID"),
 });
 
+// ── Projects (placeholder — Gitea has no projects REST API yet) ──
+
+export const ListProjectsSchema = z.object({
+  owner: z
+    .string()
+    .optional()
+    .describe("Repository owner (defaults to GITEA_DEFAULT_OWNER). Placeholder tool: always returns an empty list — Gitea has no projects REST API yet (go-gitea/gitea#36824)."),
+  repo: z
+    .string()
+    .optional()
+    .describe("Repository name (defaults to GITEA_DEFAULT_REPO). Placeholder tool: always returns an empty list — Gitea has no projects REST API yet (go-gitea/gitea#36824)."),
+});
+
+export const GetProjectSchema = z.object({
+  owner: z
+    .string()
+    .optional()
+    .describe("Repository owner (defaults to GITEA_DEFAULT_OWNER). Placeholder tool: always reports not-found — Gitea has no projects REST API yet (go-gitea/gitea#36824)."),
+  repo: z
+    .string()
+    .optional()
+    .describe("Repository name (defaults to GITEA_DEFAULT_REPO). Placeholder tool: always reports not-found — Gitea has no projects REST API yet (go-gitea/gitea#36824)."),
+  id: z
+    .number()
+    .int()
+    .min(1)
+    .describe("Project ID (placeholder — always reports not-found because Gitea has no projects REST API yet)"),
+});
+
 export const ResolveRepoSchema = z.object({
   path: z.string().optional().describe("Path to the git repository (defaults to current directory)"),
 });

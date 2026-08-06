@@ -66,6 +66,8 @@ import {
   UpdateWikiPageSchema,
   DeleteWikiPageSchema,
   ListWikiRevisionsSchema,
+  ListProjectsSchema,
+  GetProjectSchema,
 } from "./tools.js";
 import { parseRemotes, selectRemote, resolveGitConfigPath } from "./git-config.js";
 import type { CandidateCredential } from "./credentials.js";
@@ -1128,6 +1130,40 @@ export async function createServer(
       const revisions = await client.listWikiRevisions(owner, repo, input.pageName, input.page);
       return {
         content: [{ type: "text", text: JSON.stringify(revisions, null, 2) }],
+      };
+    },
+  );
+
+  // ── Projects (placeholder — always empty / not-found) ──
+
+  server.registerTool(
+    "list_projects",
+    {
+      description:
+        "List repository project boards (kanban). PLACEHOLDER: always returns an empty list because Gitea does not yet ship a REST API for project boards (go-gitea/gitea#36824). No HTTP request is made. The contract is stable so planning workflows can ask about projects without breaking; wiring the real endpoint will be a transparent change once the upstream API lands.",
+      inputSchema: ListProjectsSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const projects = await client.listProjects({ owner, repo });
+      return {
+        content: [{ type: "text", text: JSON.stringify(projects, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_project",
+    {
+      description:
+        "Fetch one repository project board (kanban) by `id`. PLACEHOLDER: always reports not-found (HTTP 404 semantics) because Gitea does not yet ship a REST API for project boards (go-gitea/gitea#36824). No HTTP request is made. The contract is stable so workflows can attempt to look up a project without breaking; the real endpoint will be wired transparently once the upstream API lands.",
+      inputSchema: GetProjectSchema.shape,
+    },
+    async (input) => {
+      const { owner, repo } = resolve(input);
+      const project = await client.getProject({ owner, repo, id: input.id });
+      return {
+        content: [{ type: "text", text: JSON.stringify(project, null, 2) }],
       };
     },
   );

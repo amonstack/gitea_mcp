@@ -385,6 +385,19 @@ gitea-mcp
 > tools handle the API's base64 encoding for you. Requires the repo's wiki
 > feature to be enabled (404 otherwise).
 
+### Projects (Placeholder)
+
+| Tool | Description |
+|------|-------------|
+| `list_projects` | List project boards (kanban) — **placeholder: always returns `[]`** (Gitea has no projects REST API yet) |
+| `get_project` | Get a project board by `id` — **placeholder: always reports not-found** (Gitea has no projects REST API yet) |
+
+> **Note:** These tools exist as a stable contract so planning workflows can ask
+> about projects without breaking. They make no HTTP request and always return
+> empty / not-found results. When the upstream Gitea projects REST API lands
+> ([go-gitea/gitea#36824](https://github.com/go-gitea/gitea/issues/36824)),
+> real HTTP calls will be wired in transparently.
+
 ### Repository Helpers
 
 | Tool | Description |

@@ -32,6 +32,8 @@ import {
   AddIssueBlockSchema,
   RemoveIssueBlockSchema,
   CheckIssueBlockedSchema,
+  ListProjectsSchema,
+  GetProjectSchema,
 } from "../tools.js";
 
 describe("ListIssuesSchema", () => {
@@ -544,5 +546,39 @@ describe("RemoveIssueBlockSchema", () => {
     const result = RemoveIssueBlockSchema.parse({ index: 7, dep_index: 9 });
     expect(result.index).toBe(7);
     expect(result.dep_index).toBe(9);
+  });
+});
+
+// ── Projects (placeholder) ──
+
+describe("ListProjectsSchema", () => {
+  it("accepts empty input", () => {
+    const result = ListProjectsSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts owner/repo", () => {
+    const result = ListProjectsSchema.parse({ owner: "o", repo: "r" });
+    expect(result.owner).toBe("o");
+    expect(result.repo).toBe("r");
+  });
+});
+
+describe("GetProjectSchema", () => {
+  it("requires id", () => {
+    const result = GetProjectSchema.safeParse({ owner: "a", repo: "b" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a non-positive id", () => {
+    const result = GetProjectSchema.safeParse({ id: 0 });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts id with optional owner/repo", () => {
+    const result = GetProjectSchema.parse({ owner: "o", repo: "r", id: 5 });
+    expect(result.id).toBe(5);
+    expect(result.owner).toBe("o");
+    expect(result.repo).toBe("r");
   });
 });

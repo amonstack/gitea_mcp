@@ -1377,4 +1377,38 @@ describe("GiteaClient", () => {
       });
     });
   });
+
+  describe("projects (placeholder)", () => {
+    it("listProjects returns an empty array", async () => {
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      const result = await client.listProjects({ owner: "o", repo: "r" });
+      expect(result).toEqual([]);
+    });
+
+    it("listProjects makes no fetch call", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await client.listProjects({ owner: "o", repo: "r" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("getProject throws GiteaApiError with status 404", async () => {
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await expect(client.getProject({ owner: "o", repo: "r", id: 1 })).rejects.toThrow(
+        "Gitea API error (404)",
+      );
+      await expect(client.getProject({ owner: "o", repo: "r", id: 1 })).rejects.toBeInstanceOf(
+        GiteaApiError,
+      );
+    });
+
+    it("getProject makes no fetch call", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const client = new GiteaClient({ baseUrl: "https://g", token: "t" });
+      await expect(client.getProject({ owner: "o", repo: "r", id: 1 })).rejects.toThrow();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });

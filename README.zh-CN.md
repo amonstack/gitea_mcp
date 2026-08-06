@@ -367,6 +367,18 @@ gitea-mcp
 > 内容始终是纯 Markdown——工具会自动处理 API 的 base64 编解码。需要仓库已开启
 > wiki 功能（否则返回 404）。
 
+### 项目看板 (Projects — 占位工具)
+
+| 工具 | 说明 |
+|------|------|
+| `list_projects` | 列出项目看板（看板视图）—— **占位工具：始终返回 `[]`**（Gitea 尚无项目看板 REST API） |
+| `get_project` | 按 `id` 获取项目看板 —— **占位工具：始终返回未找到**（Gitea 尚无项目看板 REST API） |
+
+> **说明：** 这两个工具作为稳定契约存在，让规划类工作流可以查询项目看板而不报错。
+> 它们不会发起 HTTP 请求，始终返回空列表 / 未找到。当 Gitea 项目看板 REST API
+> 落地后（[go-gitea/gitea#36824](https://github.com/go-gitea/gitea/issues/36824)），
+> 真实的 HTTP 调用将被透明接入。
+
 ### 仓库辅助 (Repository Helpers)
 
 | 工具 | 说明 |
