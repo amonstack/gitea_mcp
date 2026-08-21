@@ -40,7 +40,13 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          # List OPEN alerts of the rule (dismissed/fixed excluded by state).
+          # List OPEN alerts of both the stock rule and the vendored copy
+          # (dismissed/fixed excluded by state). The vendored pack
+          # (.github/codeql, issue #79) runs the same flow query with a
+          # function-scoped barrier on the confined upload reader, so ANY
+          # open alert under EITHER rule id is a genuine new file → HTTP
+          # flow: one that bypassed the barrier (vendored) or an instance
+          # of the stock rule outside the designed attachment flow.
           # Pagination is followed; the repo has few alerts, so one page is
           # the norm and the loop is just future-proofing.
           page=1
@@ -49,7 +55,15 @@ jobs:
             response=$(gh api --paginate=false \
               "repos/${REPO}/code-scanning/alerts?state=open&rule=js%2Ffile-access-to-http&per_page=100&page=${page}" \
               --method GET -H "Accept: application/vnd.github+json")
-            count=$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).length))' "$response")
+            vendored=$(gh api --paginate=false \
+              "repos/${REPO}/code-scanning/alerts?state=open&rule=js%2Ffile-access-to-http-unconfined&per_page=100&page=${page}" \
+              --method GET -H "Accept: application/vnd.github+json")
+            combined=$(node -e '
+              const a = JSON.parse(process.argv[1]);
+              const b = JSON.parse(process.argv[2]);
+              process.stdout.write(JSON.stringify(a.concat(b)));
+            ' "$response" "$vendored")
+            count=$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).length))' "$combined")
             if [ "$count" = "0" ]; then
               break
             fi
@@ -59,7 +73,7 @@ jobs:
                 const loc = a.most_recent_instance?.location;
                 console.log(`#${a.number} ${a.rule.id} ${loc ? `${loc.path}:${loc.start_line}` : "(no location)"}`);
               }
-            ' "$response")
+            ' "$combined")
             hits="${hits}${batch}\n"
             if [ "$count" -lt 100 ]; then
               break
@@ -67,9 +81,9 @@ jobs:
             page=$((page + 1))
           done
           if [ -n "$(echo "$hits" | tr -d "[:space:]")" ]; then
-            echo "::error::New js/file-access-to-http alert(s) found (open, not dismissed):"
+            echo "::error::New file-access-to-http alert(s) found (open, not dismissed):"
             echo "$hits"
-            echo "The two designed flows are documented in docs/architecture.md §5.3; the attachment alert is dismissed once (#79). A NEW open alert means a new file → HTTP flow appeared — fix it at the source or confine it, then dismiss with a recorded reason."
+            echo "The designed attachment flow is documented in docs/architecture.md §5.3 (stock-rule instance dismissed once per #79; the vendored rule's barrier exempts only the confined readUploadFile reader). A NEW open alert under either rule id means a new unconfined file → HTTP flow — fix it at the source or confine it, then dismiss with a recorded reason."
             exit 1
           fi
-          echo "No open js/file-access-to-http alerts — guard passed."
+          echo "No open file-access-to-http alerts (stock or vendored) — guard passed."

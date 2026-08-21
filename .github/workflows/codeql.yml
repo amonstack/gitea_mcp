@@ -42,7 +42,13 @@ jobs:
           # nothing). The credential-flow suppressions were removed with the
           # flow itself in issue #79 (credential retrieval now goes through
           # git subprocesses, so there is no file-read source to suppress).
-          packs: codeql/javascript-queries:AlertSuppression.ql
+          # The local pack vendored per #79 runs the file-access-to-http
+          # query with a function-scoped barrier on the confined upload
+          # reader (`readUploadFile`, #76) under its own rule id — the stock
+          # rule above keeps running unchanged for everything else.
+          packs: |
+            codeql/javascript-queries:AlertSuppression.ql
+            ./.github/codeql
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4

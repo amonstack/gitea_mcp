@@ -262,20 +262,27 @@ credential behavior is a small state machine over a `CandidateCredential[]`
   surfaces a redacted view via `getCredentialStatus()` → `summarizeCandidates()`
   (`secretPresent: boolean`, masked username `firstChar***`).
 - **CodeQL `js/file-access-to-http` mitigation:** one designed file → HTTP
-  data flow reaches the `doRequest` fetch sink, and it carries a justified
-  line-scoped suppression where the taint enters the request — the rule stays
-  globally enabled: the attachment-upload flow — multipart `FormData` bodies
-  carry a local file's bytes, and the upload source was hardened FIRST per
-  issue #76: `readUploadFile` in `server.ts` confines it (realpath upload-root
-  confinement, sensitive-location deny-list, extension allow-list, size cap,
-  path-free generic errors) before the bytes ever reach the client; the alert
-  is dismissed once on GitHub with a recorded reason (#79), and a CI guard
-  fails on any NEW open alert of this rule (`.github/workflows/codeql-guard.yml`).
-  The former credential flow (alert #8) no longer exists as a file-read flow:
-  since #79, credential retrieval goes through git's own machinery
+  data flow reaches the `doRequest` fetch sink — the attachment-upload flow:
+  multipart `FormData` bodies carry a local file's bytes, and the upload
+  source was hardened FIRST per issue #76: `readUploadFile` in `server.ts`
+  confines it (realpath upload-root confinement, sensitive-location
+  deny-list, extension allow-list, size cap, path-free generic errors)
+  before the bytes ever reach the client. The stock rule's alert for this
+  flow is dismissed once on GitHub with a recorded reason (#79 Track 2),
+  and the rule itself stays globally enabled. Two guardrails make the
+  dismissal non-decaying: (1) `codeql-guard.yml` fails on any NEW open
+  alert of this rule (or of the vendored rule below); (2) a vendored copy
+  of the query in `.github/codeql/` (issue #79, optional hardening) runs
+  the same flow analysis with a **function-scoped barrier**: taint that
+  passes through a `readUploadFile(...)` call result is sanitized, so the
+  designed flow is exempted semantically (rename or bypass the reader and
+  the alert returns) instead of by alert identity — everything else alerts
+  under the rule id `js/file-access-to-http-unconfined`.
+  The former credential flow (alert #8) no longer exists as a file-read
+  flow: since #79, credential retrieval goes through git's own machinery
   (`git config get --url=...` / `git credential fill`), so the secret enters
   via subprocess stdout, which the query's `FileSystemReadAccess` source does
-  not match — no suppression needed, and the rule keeps guarding the rest of
+  not match — no suppression needed, and the rules keep guarding the rest of
   the codebase against genuine backdoor injection.
 
 `GiteaApiError extends Error` with typed `{status, statusText, body}` fields so

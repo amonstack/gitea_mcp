@@ -1,0 +1,4 @@
+name: amonstack/gitea-mcp/codeql
+version: 1.0.0
+dependencies:
+  codeql/javascript-all: "*"
