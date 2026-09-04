@@ -1,10 +1,5 @@
 import { z } from "zod";
 
-export const GiteaConfigSchema = z.object({
-  baseUrl: z.string().describe("Gitea instance base URL (e.g., https://gitea.example.com)"),
-  token: z.string().describe("Gitea API access token"),
-});
-
 export const ListIssuesSchema = z.object({
   owner: z.string().optional().describe("Repository owner (defaults to GITEA_DEFAULT_OWNER)"),
   repo: z.string().optional().describe("Repository name (defaults to GITEA_DEFAULT_REPO)"),

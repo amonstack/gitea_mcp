@@ -1,7 +1,7 @@
 <p align="center">
   <img alt="gitea-mcp" src="https://raw.githubusercontent.com/amonstack/gitea_mcp/master/docs/assets/gitea-mcp-banner.png" />
   <h3 align="center">gitea-mcp</h3>
-  <p align="center">MCP 服务端，将 Gitea 的议题、标签、里程碑、评论与主题封装为工具，供 AI 助手调用</p>
+  <p align="center">MCP 服务端，将 Gitea 与 GitLab 的仓库操作——议题、标签、里程碑、评论、合并请求、Release、Actions 与 Wiki——封装为工具，供 AI 助手调用</p>
 </p>
 
 ---
@@ -15,7 +15,7 @@
 
 [English](https://github.com/amonstack/gitea_mcp/blob/master/README.md) | **中文文档**
 
-`gitea-mcp` 是一个 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 服务端，将 Gitea 仓库操作暴露为 MCP 工具。连接到 MCP 客户端（Claude Desktop、opencode、Cursor 等）后，AI 助手即可通过自然语言在 Gitea 实例上创建、查询、更新和删除议题、标签、里程碑、评论和主题。
+`gitea-mcp` 是一个 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 服务端，将 Gitea 仓库操作暴露为 MCP 工具。连接到 MCP 客户端（Claude Desktop、opencode、Cursor 等）后，AI 助手即可通过自然语言在 Gitea 实例上创建、查询、更新和删除议题、标签、里程碑、评论、合并请求、Release、Actions 运行与 Wiki 页面。
 
 服务端通过 stdio 通信，封装了 [Gitea REST API (`/api/v1`)](https://docs.gitea.com/api/1.22/)。同时支持 **GitLab**（gitlab.com 与自建实例）作为第二平台——见 [GitLab 支持](#gitlab-支持)。
 
@@ -24,7 +24,7 @@
 - **GitLab 支持** —— 同一套工具运行于 gitlab.com 与自建 GitLab 实例（`MCP_PLATFORM=gitlab` 或 `GITLAB_*` 环境变量契约）
 - **完整的 Gitea 项目管理** —— 通过自然语言管理议题、标签、里程碑、评论与主题
 - **零配置自动发现** —— 从项目 git 配置读取 `baseUrl`、`owner`、`repo` 与令牌；一次全局安装即可服务多个仓库
-- **多来源认证 + 自动容错** —— 依次尝试 `[gitea]` 配置令牌、`GITEA_TOKEN`、git 自身的凭据机制（`git credential fill`，支持存储文件与 OS 钥匙串），遇 `401`/`403` 自动切换
+- **多来源认证 + 自动容错** —— 依次尝试 `GITEA_REPO_URL` 内嵌的 userinfo、`[gitea]` 配置令牌、`GITEA_TOKEN`、git 自身的凭据机制（`git credential fill`，支持存储文件与 OS 钥匙串），遇 `401`/`403` 自动切换
 - **按动作划分的技能** —— 每个工作流一个技能（查找、创建、打标签、评论、规划里程碑……），适配 opencode、Claude Code、Cursor 等
 - **客户端无关** —— 兼容任何基于 stdio 的 MCP 客户端；同时内置引导提示与按需参考资源
 
@@ -45,7 +45,7 @@
 
 - **Node.js ≥ 24** —— 使用全局 `fetch`
 - **git ≥ 2.46**（在 `PATH` 上）—— 用于凭据发现（`git config get` / `git credential fill`；`git credential fill` 同时支持所有已配置的凭据 helper，含 OS 钥匙串）。git 完全不可用时，发现降级为仅环境变量来源（`GITEA_REPO_URL` / `GITEA_TOKEN`）/ 匿名模式——`gitea_status` 会报告 `gitAvailable: false`。git < 2.46 时，`.git/config [gitea]` 令牌来源会静默失效（退出码不可区分）；凭据 helper 与环境变量来源仍可用。
-- 一个可通过 HTTP 访问的 **Gitea 实例**（自托管或 Gitea Cloud）
+- 一个可通过 HTTP 访问的 **Gitea 实例**（自托管或 Gitea Cloud）——或 **GitLab 实例**（gitlab.com 与自建实例）
 - 一个 **Gitea API 令牌**（或一条 git 凭据），用于读取公开仓库以外的操作
 
 ## 安装
@@ -74,8 +74,8 @@ npm install -g @amonstack/gitea-mcp
 ### 从源码构建
 
 ```bash
-git clone https://github.com/amonstack/gitea-mcp.git
-cd gitea-mcp
+git clone https://github.com/amonstack/gitea_mcp.git
+cd gitea_mcp
 npm ci
 npm run build
 node dist/cli.js
@@ -279,7 +279,7 @@ gitea-mcp init --dir /exact/path    # 自定义路径
 ### 其他 MCP 客户端
 
  任何支持 stdio 方式运行 MCP 服务端的客户端都可以使用。安装完成后，在克隆的 Gitea 仓库内
- 吏动即可（配置会自动发现）：
+ 启动即可（配置会自动发现）：
 
 ```bash
 cd /path/to/your/gitea-repo
@@ -521,8 +521,8 @@ gitea-mcp
 ## 二次开发
 
 ```bash
-git clone https://github.com/amonstack/gitea-mcp.git
-cd gitea-mcp
+git clone https://github.com/amonstack/gitea_mcp.git
+cd gitea_mcp
 npm ci
 ```
 
@@ -534,6 +534,7 @@ npm ci
 | `make test-watch` | 监听模式运行测试 |
 | `make test-integration` | 运行集成测试（需要可用的 Gitea 实例） |
 | `make scan` | 用 gitleaks 扫描泄露的密钥（属于 `make verify`） |
+| `make verify` | 完整 CI 门禁：安装依赖、密钥扫描、类型检查、构建、单元测试与冒烟运行 |
 | `make dev` | 通过 tsx 直接运行 |
 
 完整的架构说明（模块布局、依赖关系、核心模式，以及新增工具的指引）请参阅

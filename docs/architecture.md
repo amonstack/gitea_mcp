@@ -85,6 +85,7 @@ src/
 ├── skills.ts         # skill install logic + tool registry (gitea-mcp init --tool <name>)
 ├── assets/           # Guidance content (shipped inside dist/ via copy-assets)
 │   ├── instructions.md          # handshake instructions (Track A)
+│   ├── instructions-gitlab.md   # GitLab handshake instructions (§5.6)
 │   ├── resources/*.md           # on-demand reference docs (Track A)
 │   └── skills/<action>/SKILL.md # action skills, one per workflow (Track B)
 └── __tests__/

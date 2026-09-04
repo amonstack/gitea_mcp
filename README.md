@@ -1,7 +1,7 @@
 <p align="center">
   <img alt="gitea-mcp" src="https://raw.githubusercontent.com/amonstack/gitea_mcp/master/docs/assets/gitea-mcp-banner.png" />
   <h3 align="center">gitea-mcp</h3>
-  <p align="center">MCP server that exposes Gitea issues, labels, milestones, comments, and topics as tools for AI assistants</p>
+  <p align="center">MCP server that exposes Gitea and GitLab repository operations — issues, labels, milestones, comments, pull requests, releases, Actions, and wiki — as tools for AI assistants</p>
 </p>
 
 ---
@@ -15,7 +15,7 @@
 
 **English** | [中文文档](https://github.com/amonstack/gitea_mcp/blob/master/README.zh-CN.md)
 
-`gitea-mcp` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes Gitea repository operations as tools. Once connected to an MCP client (Claude Desktop, opencode, Cursor, etc.), an AI assistant can list, create, update, and delete issues, labels, milestones, comments, and topics on your Gitea instance — all through natural language.
+`gitea-mcp` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes Gitea repository operations as tools. Once connected to an MCP client (Claude Desktop, opencode, Cursor, etc.), an AI assistant can list, create, update, and delete issues, labels, milestones, comments, pull requests, releases, Actions runs, and wiki pages on your Gitea instance — all through natural language.
 
 The server communicates over stdio and wraps the [Gitea REST API (`/api/v1`)](https://docs.gitea.com/api/1.22/). **GitLab** (gitlab.com and self-managed) is supported as a second platform — see [GitLab support](#gitlab-support).
 
@@ -24,7 +24,7 @@ The server communicates over stdio and wraps the [Gitea REST API (`/api/v1`)](ht
 - **GitLab support** — the same tool set against gitlab.com and self-managed GitLab instances (`MCP_PLATFORM=gitlab` or the `GITLAB_*` env contract)
 - **Full Gitea project management** — issues, labels, milestones, comments, and topics via natural language
 - **Zero-config auto-discovery** — reads `baseUrl`, `owner`, `repo`, and token from the project's git config; one global install serves many repos
-- **Multi-source auth with failover** — tries `[gitea]` config tokens, `GITEA_TOKEN`, then git's own credential machinery (`git credential fill` — store file or OS keychain), advancing automatically on `401`/`403`
+- **Multi-source auth with failover** — tries the `GITEA_REPO_URL` userinfo, `[gitea]` config tokens, `GITEA_TOKEN`, then git's own credential machinery (`git credential fill` — store file or OS keychain), advancing automatically on `401`/`403`
 - **Action-scoped skills** — ships one skill per workflow (find, create, label, comment, plan milestones, …) for opencode, Claude Code, Cursor, and more
 - **Client-agnostic** — works with any stdio-based MCP client; ships guidance prompts and on-demand reference resources too
 
@@ -45,7 +45,7 @@ The server communicates over stdio and wraps the [Gitea REST API (`/api/v1`)](ht
 
 - **Node.js ≥ 24** — uses the global `fetch`
 - **git ≥ 2.46** on `PATH` — used for credential discovery (`git config get` / `git credential fill`; `git credential fill` also honors every configured credential helper, including OS keychains). When git cannot be used at all, discovery falls back to the env-only sources (`GITEA_REPO_URL` / `GITEA_TOKEN`) / anonymous mode — `gitea_status` reports `gitAvailable: false`. On git < 2.46, the `.git/config [gitea]` token source silently fails (exit codes are indistinguishable); credential helpers and the env sources still work.
-- A **Gitea instance** (self-hosted or Gitea Cloud) reachable over HTTP
+- A **Gitea instance** (self-hosted or Gitea Cloud) — or a **GitLab instance** (gitlab.com or self-managed) — reachable over HTTP
 - A **Gitea API token** (or a git credential) for anything beyond reading public repositories
 
 ## Installation
@@ -75,8 +75,8 @@ npm install -g @amonstack/gitea-mcp
 ### Build from source
 
 ```bash
-git clone https://github.com/amonstack/gitea-mcp.git
-cd gitea-mcp
+git clone https://github.com/amonstack/gitea_mcp.git
+cd gitea_mcp
 npm ci
 npm run build
 node dist/cli.js
@@ -557,8 +557,8 @@ left to the tool descriptions so they never contaminate a creative workflow.
 ## Development
 
 ```bash
-git clone https://github.com/amonstack/gitea-mcp.git
-cd gitea-mcp
+git clone https://github.com/amonstack/gitea_mcp.git
+cd gitea_mcp
 npm ci
 ```
 
@@ -570,6 +570,7 @@ npm ci
 | `make test-watch` | Run tests in watch mode |
 | `make test-integration` | Run integration tests (needs live Gitea instance) |
 | `make scan` | Scan for leaked secrets with gitleaks (part of `make verify`) |
+| `make verify` | Full CI gate: install, secret scan, lint, build, unit tests, smoke run |
 | `make dev` | Run directly with tsx |
 
 For the full architecture — module layout, dependency graph, core patterns, and
